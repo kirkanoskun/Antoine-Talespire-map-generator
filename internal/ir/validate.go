@@ -43,6 +43,9 @@ func (doc *IR) Validate() error {
 	if doc.Map.Width > MaxDimension || doc.Map.Length > MaxDimension {
 		return fmt.Errorf("map dimensions %dx%d exceed maximum %d", doc.Map.Width, doc.Map.Length, MaxDimension)
 	}
+	if !KnownBiomes[doc.Map.Biome] {
+		return fmt.Errorf("map: unknown biome %q", doc.Map.Biome)
+	}
 	if len(doc.Zones) == 0 {
 		return fmt.Errorf("at least one zone is required")
 	}
@@ -60,9 +63,9 @@ func (doc *IR) Validate() error {
 		}
 		ids[z.ID] = true
 
-		if !KnownBiomes[z.Biome] {
-			return fmt.Errorf("%s: unknown biome %q", where, z.Biome)
-		}
+		// relief_override existence is validated against the biome catalogue at
+		// generation time (the IR layer does not load configs); here we only
+		// reject a structurally empty override string if the key is present.
 		if z.RelativeSize <= 0 || z.RelativeSize > 1 {
 			return fmt.Errorf("%s: relative_size must be in (0,1], got %g", where, z.RelativeSize)
 		}

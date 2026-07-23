@@ -1,9 +1,8 @@
 {
-  "map": { "width": 50, "length": 50, "name": "Cour de chateau en ruines" },
+  "map": { "width": 50, "length": 50, "name": "Cour de chateau en ruines", "biome": "temperate_forest" },
   "zones": [
     {
       "id": "courtyard",
-      "biome": "temperate_forest",
       "anchor": { "x": 25, "y": 25 },
       "relative_size": 0.35,
       "elevation": "flat",
@@ -12,18 +11,18 @@
     },
     {
       "id": "pond",
-      "biome": "swamp",
       "anchor": { "x": 25, "y": 33, "direction_from": "courtyard: south" },
       "relative_size": 0.1,
       "elevation": "depression",
+      "relief_override": "water",
       "description": "Mare au sud de la cour"
     },
     {
       "id": "ruins_north",
-      "biome": "dead_forest",
       "anchor": { "x": 25, "y": 7, "direction_from": "courtyard: north" },
       "relative_size": 0.2,
       "elevation": "hill",
+      "relief_override": "ruins",
       "points_of_interest": [
         { "prop": "broken_pillar", "position": "scattered", "count": 4 },
         { "prop": "altar", "position": { "x": 25, "y": 4 } }

@@ -16,11 +16,13 @@ import (
 	"strings"
 )
 
-// Map describes the overall canvas.
+// Map describes the overall canvas. A map has a single dominant biome, fixed
+// for the whole map; zones only modulate within it (see Zone).
 type Map struct {
 	Width  int    `json:"width"`
 	Length int    `json:"length"`
 	Name   string `json:"name"`
+	Biome  string `json:"biome"`
 }
 
 // Anchor is an approximate position for a zone. X/Y are tile coordinates on the
@@ -94,13 +96,16 @@ type PointOfInterest struct {
 	Count    int      `json:"count"`
 }
 
-// Zone is a single semantic region of the map.
+// Zone is a single semantic region of the map. Zones never change the biome
+// (that is fixed at the map level). Within the map's biome, a zone modulates:
+// the prop density (DensityOverrides), the relief used (ReliefOverride, which
+// must name a relief of the map's biome), and the explicit points of interest.
 type Zone struct {
 	ID               string             `json:"id"`
-	Biome            string             `json:"biome"`
 	Anchor           Anchor             `json:"anchor"`
 	RelativeSize     float64            `json:"relative_size"`
 	Elevation        Elevation          `json:"elevation"`
+	ReliefOverride   string             `json:"relief_override,omitempty"`
 	DensityOverrides map[string]float64 `json:"density_overrides,omitempty"`
 	PointsOfInterest []PointOfInterest  `json:"points_of_interest,omitempty"`
 	Description      string             `json:"description,omitempty"`

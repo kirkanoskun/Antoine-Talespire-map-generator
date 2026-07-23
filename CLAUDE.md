@@ -8,12 +8,31 @@ so far.
 
 Describe a scene in plain French (e.g. *"une cour de château en ruines, avec une
 mare au centre et des arbres morts autour, un chemin qui monte vers des vestiges
-au nord"*) and get a coherent TaleSpire map, with a 2D visual round-trip before
-the final export into the game.
+au nord"*) and get a **coherent** TaleSpire map, with a 2D visual round-trip
+before the final export into the game.
 
 The highest ambition level is the target: the model reasons about the **whole
 map layout like a level designer**, not merely picking parameters inside one
 existing biome.
+
+## Core rule: one biome per map (coherence over collage)
+
+A map has **one dominant biome**, fixed once for the whole map (e.g.
+`temperate_forest`). This is a hard rule everywhere in the project — the goal is
+coherent scenes, not collages of unrelated biomes touching each other.
+
+**Zones never change the biome.** Within the single map biome, a zone only
+modulates:
+- **prop density** (more/fewer trees, stones, …) via `density_overrides`;
+- **the relief used** (`water`, `base_ground`, `ground`, `mountain`, or a new
+  relief such as `ruins`) via an optional `relief_override`;
+- **explicit points of interest** placed deterministically (altar, columns, …).
+
+If a description needs something the chosen biome does not have yet (e.g. ruins
+in a temperate forest), the correct response is to **add a new relief entry to
+that biome in `configs/biomes.json`** (with building blocks and props coherent
+with the rest of the biome) — *not* to borrow another existing biome for that
+zone. The `ruins` relief on `temperate_forest` is the worked example.
 
 ## What we reuse from taleslab, what we go beyond
 
@@ -31,30 +50,34 @@ Reused as-is:
 
 What taleslab does **not** do, and is the real subject of this project:
 - No natural-language layer — everything is hand-filled Go structs.
-- No **distinct semantic zones** on one map. A `MapGeneration` applies a single
-  biome to the whole map (at most a single left-to-right gradient between two
-  biomes). It cannot express "a dead-forest zone touching a ruins zone touching
-  a paved courtyard".
+- No **modulation within a biome**. A `MapGeneration` applies a single relief
+  system uniformly (height noise decides `ground`/`mountain`/`water`); it cannot
+  express "this region is paved courtyard, that region is ruins, that one is a
+  pond" as deliberate, placed zones inside one coherent biome.
 - No **precise placement** of individual elements ("an altar at the centre of
   the ruins"). All prop placement is weighted-random.
 
 ## Pipeline (8 steps)
 
 1. **NL → IR**: a Claude API call turns the free description into an intermediate
-   JSON (see step 2). The model reasons about zones/relations/POIs, not tiles.
+   JSON (see step 2). The model picks one biome and reasons about
+   zones/relations/POIs, not tiles.
 2. **IR (level-design intermediate representation)**: engine-independent JSON
-   pivot. Zones with biome, approximate anchor, relative size, elevation,
-   density overrides, explicit points of interest; plus connections.
+   pivot. One **biome at the map level**; zones with approximate anchor, relative
+   size, elevation, optional `relief_override`, density overrides, and explicit
+   points of interest; plus connections.
 3. **Deterministic spatial resolution (IR → zone mask)**: a classic geometric
    algorithm (weighted Voronoi now, relaxation later) turns approximate anchors
    + relative sizes into an exact per-tile zone mask. The LLM never computes a
    60×60 grid.
 4. **Per-zone content generation**: for each tile, generate ground + props using
-   *that tile's* zone biome and densities, reusing taleslab's catalogues.
-   Explicit POIs are placed deterministically on top.
-5. **Zone stitching / transitions**: blend soil and prop densities across a few
-   tiles at zone borders. **Biggest technical risk** — taleslab only does one
-   biome per map. Not yet implemented (Phase 3).
+   the **map's single biome**, the tile's resolved relief (`relief_override` or
+   the height-derived relief) and the zone's density overrides, reusing
+   taleslab's catalogues. Explicit POIs are placed deterministically on top.
+5. **Zone stitching / transitions**: smooth prop **density and height** across a
+   few tiles at zone borders. Because every zone shares one biome, this is a
+   simple intra-biome smoothing — *not* a fusion of two generation systems. Not
+   yet implemented (Phase 3).
 6. **2D preview**: top-down image (colour per biome, height shading, POI markers)
    generated before any TaleSpire export. Enables the fast iteration loop.
 7. **TaleSpire export**: encode the slab to the base64 blob via `talescoder`.
@@ -71,8 +94,9 @@ What taleslab does **not** do, and is the real subject of this project:
 ## Phases
 
 - **Phase 1 — foundation (DONE, this is where we are).** Import taleslab, write
-  per-zone generation bounded to a perimeter, validate two different-biome zones
-  side by side (no careful transition yet).
+  per-zone generation within one biome (relief/density modulation bounded to each
+  zone's perimeter), validate two distinct zones of the same biome side by side
+  (no careful transition yet).
 - **Phase 2 — IR + NL.** Finalise the IR schema, build the Claude prompt/call
   that turns a description into valid IR, with strict schema validation + retry.
   Test on ~10 varied descriptions.
@@ -107,8 +131,14 @@ go test ./...
 
 - **taleslab as a dependency, not a fork.** We reimplement only the slice-fill
   orchestration (`internal/generator`) to be zone-aware, reusing taleslab's
-  repositories, entities, grid functions and encoder. The seam is per-tile
-  biome lookup from the mask instead of taleslab's single X-axis gradient.
+  repositories, entities, grid functions and encoder. The seam is a per-tile
+  **relief** lookup from the mask (within the map's single biome) instead of
+  taleslab's uniform height-derived relief.
+- **`relief_override` precedence.** A zone's `relief_override` wins for the
+  *material* (which relief/blocks/props a tile uses); elevation still controls
+  *height*. A deep depression becomes water only when the zone does not override
+  the relief (see `shapeTerrain`). `relief_override` is validated against the
+  map biome's reliefs at generation time — an unknown relief fails loudly.
 - **Deterministic output.** taleslab's `TaleSpireSlabFromSlab` groups assets via
   Go map iteration (random order → non-reproducible base64). We use our own
   `taleSpireSlabFromSlab` (first-seen order) so a given seed yields identical
@@ -118,6 +148,9 @@ go test ./...
   Nested/contained zones need a different resolution step — a Phase 3 concern.
   `testdata/castle.json` offsets the pond so Phase 1 demonstrates *adjacent*
   zones (its explicit goal).
+- **New reliefs, not borrowed biomes.** Needs unmet by the biome (ruins, paving,
+  …) are added as reliefs to that biome in `configs/biomes.json`. `ruins` was
+  added to `temperate_forest` (broken-stone floor blocks + wall/skull props).
 - **POI vocabulary is bridged.** The asset catalogue is fixed and small, so
   descriptive POI names ("broken_pillar", "altar") are mapped to real prop ids
   via `internal/generator/aliases.go`. Unknown props become warnings, never
@@ -128,8 +161,9 @@ go test ./...
 
 ### Open risks (from the brief)
 
-- Zone stitching (step 5) is the main technical risk — prototype the simple
-  two-zone/straight-border case first.
+- Zone stitching (step 5) — now a simpler intra-biome density/height smoothing
+  (no biome fusion). Still worth prototyping on the two-zone/straight-border
+  case first.
 - IR reliability: validate the model's IR strictly server-side, retry on invalid.
 - Claude API call count/cost per session (one initial + one per adjustment).
 - TaleSpire's real max map size — verify before defaulting to large maps.

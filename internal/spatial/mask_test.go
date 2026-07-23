@@ -17,10 +17,10 @@ func mustParse(t *testing.T, s string) *ir.IR {
 
 func TestResolveCoversEveryTile(t *testing.T) {
 	doc := mustParse(t, `{
-		"map":{"width":40,"length":40,"name":"t"},
+		"map":{"width":40,"length":40,"name":"t","biome":"temperate_forest"},
 		"zones":[
-			{"id":"a","biome":"temperate_forest","anchor":{"x":10,"y":20},"relative_size":0.5},
-			{"id":"b","biome":"desert","anchor":{"x":30,"y":20},"relative_size":0.5}
+			{"id":"a","anchor":{"x":10,"y":20},"relative_size":0.5},
+			{"id":"b","anchor":{"x":30,"y":20},"relative_size":0.5}
 		]}`)
 	m := Resolve(doc)
 	total := 0
@@ -39,10 +39,10 @@ func TestLargerRelativeSizeWinsMoreArea(t *testing.T) {
 	// Same anchors distance apart; zone "big" has a much larger relative size
 	// and must claim strictly more tiles than "small".
 	doc := mustParse(t, `{
-		"map":{"width":60,"length":60,"name":"t"},
+		"map":{"width":60,"length":60,"name":"t","biome":"temperate_forest"},
 		"zones":[
-			{"id":"big","biome":"temperate_forest","anchor":{"x":20,"y":30},"relative_size":0.8},
-			{"id":"small","biome":"desert","anchor":{"x":40,"y":30},"relative_size":0.1}
+			{"id":"big","anchor":{"x":20,"y":30},"relative_size":0.8},
+			{"id":"small","anchor":{"x":40,"y":30},"relative_size":0.1}
 		]}`)
 	m := Resolve(doc)
 	counts := m.TileCounts()
@@ -53,10 +53,10 @@ func TestLargerRelativeSizeWinsMoreArea(t *testing.T) {
 
 func TestBoundaryDetection(t *testing.T) {
 	doc := mustParse(t, `{
-		"map":{"width":40,"length":40,"name":"t"},
+		"map":{"width":40,"length":40,"name":"t","biome":"temperate_forest"},
 		"zones":[
-			{"id":"a","biome":"temperate_forest","anchor":{"x":10,"y":20},"relative_size":0.5},
-			{"id":"b","biome":"desert","anchor":{"x":30,"y":20},"relative_size":0.5}
+			{"id":"a","anchor":{"x":10,"y":20},"relative_size":0.5},
+			{"id":"b","anchor":{"x":30,"y":20},"relative_size":0.5}
 		]}`)
 	m := Resolve(doc)
 	found := false

@@ -27,10 +27,10 @@ func newTestGen(t *testing.T) *Generator {
 }
 
 const twoZoneIR = `{
-	"map":{"width":40,"length":40,"name":"t"},
+	"map":{"width":40,"length":40,"name":"t","biome":"temperate_forest"},
 	"zones":[
-		{"id":"a","biome":"temperate_forest","anchor":{"x":10,"y":20},"relative_size":0.5,"elevation":"flat"},
-		{"id":"b","biome":"desert","anchor":{"x":30,"y":20},"relative_size":0.5,"elevation":"hill"}
+		{"id":"a","anchor":{"x":10,"y":20},"relative_size":0.5,"elevation":"flat"},
+		{"id":"b","anchor":{"x":30,"y":20},"relative_size":0.5,"elevation":"hill"}
 	]}`
 
 func TestGenerateProducesDecodableSlab(t *testing.T) {
@@ -87,9 +87,9 @@ func TestGenerateDeterministic(t *testing.T) {
 
 func TestUnknownPOIProducesWarning(t *testing.T) {
 	doc, err := ir.Parse([]byte(`{
-		"map":{"width":30,"length":30,"name":"t"},
+		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},
 		"zones":[{
-			"id":"a","biome":"dead_forest","anchor":{"x":15,"y":15},"relative_size":0.9,
+			"id":"a","anchor":{"x":15,"y":15},"relative_size":0.9,
 			"points_of_interest":[{"prop":"definitely_not_a_prop","position":{"x":15,"y":15}}]
 		}]}`))
 	if err != nil {
@@ -115,8 +115,8 @@ func TestPOIAliasResolves(t *testing.T) {
 
 func TestWaterInDepression(t *testing.T) {
 	doc, err := ir.Parse([]byte(`{
-		"map":{"width":30,"length":30,"name":"t"},
-		"zones":[{"id":"pond","biome":"swamp","anchor":{"x":15,"y":15},"relative_size":0.9,"elevation":"depression"}]}`))
+		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},
+		"zones":[{"id":"pond","anchor":{"x":15,"y":15},"relative_size":0.9,"elevation":"depression"}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,5 +128,56 @@ func TestWaterInDepression(t *testing.T) {
 	// The centre of a large depression should be water.
 	if !res.Height.IsWaterAt(15, 15) {
 		t.Error("expected water at the centre of a depression zone")
+	}
+}
+
+func TestReliefOverrideResolves(t *testing.T) {
+	doc, err := ir.Parse([]byte(`{
+		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},
+		"zones":[{"id":"ruins","anchor":{"x":15,"y":15},"relative_size":0.9,"elevation":"hill","relief_override":"ruins"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := newTestGen(t).Generate(doc, spatial.Resolve(doc), 1)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	// The zone centre must resolve to the ruins relief, and the material must
+	// win over the height-derived relief.
+	if got := res.Height.ReliefAt(15, 15); got != "ruins" {
+		t.Errorf("relief_override not applied at centre, got %q", got)
+	}
+}
+
+func TestUnknownReliefOverrideFails(t *testing.T) {
+	// relief_override that is not a relief of the map biome must fail loudly at
+	// generation time (config-aware validation).
+	doc, err := ir.Parse([]byte(`{
+		"map":{"width":30,"length":30,"name":"t","biome":"desert"},
+		"zones":[{"id":"z","anchor":{"x":15,"y":15},"relative_size":0.9,"relief_override":"ruins"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newTestGen(t).Generate(doc, spatial.Resolve(doc), 1); err == nil {
+		t.Error("expected error for relief_override absent from the biome, got none")
+	}
+}
+
+// TestReliefOverrideBeatsElevationRelief confirms the precedence rule: a deep
+// depression that would normally become water stays non-water when the zone
+// overrides the relief to something else.
+func TestReliefOverrideBeatsElevationRelief(t *testing.T) {
+	doc, err := ir.Parse([]byte(`{
+		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},
+		"zones":[{"id":"pit","anchor":{"x":15,"y":15},"relative_size":0.9,"elevation":"depression","relief_override":"ground"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := newTestGen(t).Generate(doc, spatial.Resolve(doc), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Height.IsWaterAt(15, 15) {
+		t.Error("relief_override 'ground' should prevent water in a depression")
 	}
 }

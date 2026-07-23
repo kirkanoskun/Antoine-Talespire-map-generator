@@ -1,11 +1,13 @@
 // Package generator turns a resolved zone mask into a TaleSpire slab.
 //
-// This is the heart of Phase 1 (brief section 5.4): it reuses taleslab's biome
-// repositories, prop catalogue, slab entities, encoder and mapper, but replaces
-// taleslab's single-biome-per-map fill with a *per-tile* biome lookup driven by
-// the zone mask. Two adjacent zones with different biomes therefore generate
-// side by side within one slab. Smooth transitions at the borders (brief 5.5)
-// are intentionally out of scope for Phase 1.
+// This is the heart of Phase 1 (brief section 5.4). A map has ONE dominant
+// biome, fixed for the whole map. Zones never change biome: they modulate,
+// within that single biome, the prop density, the relief used (via an optional
+// relief_override), and the explicit points of interest. The generator reuses
+// taleslab's biome repository, prop catalogue, slab entities and encoder; the
+// seam it adds is a per-tile relief lookup driven by the zone mask, instead of
+// taleslab's single relief-per-map fill. Smooth density/height transitions
+// between zones of the same biome (brief 5.5) are out of scope for Phase 1.
 package generator
 
 import (
@@ -30,8 +32,9 @@ const (
 	hillGain        = 4
 	mountainGain    = 9
 	depressionDepth = 3
-	// mountainThreshold: tiles raised at least this much above base are tagged
-	// as Mountain relief (which selects rockier building blocks/props).
+	// mountainThreshold: tiles raised at least this much above base take the
+	// "mountain" relief (rockier building blocks/props) unless a zone overrides
+	// the relief explicitly.
 	mountainThreshold = 5
 	groundRotation    = 768
 )
@@ -74,26 +77,45 @@ type HeightField struct {
 // HeightAt returns the terrain height at (x,y).
 func (h *HeightField) HeightAt(x, y int) int { return h.tiles[x][y].height }
 
-// IsWaterAt reports whether (x,y) is water.
-func (h *HeightField) IsWaterAt(x, y int) bool { return h.tiles[x][y].elem == elementtype.Water }
+// ReliefAt returns the resolved relief key at (x,y).
+func (h *HeightField) ReliefAt(x, y int) string { return h.tiles[x][y].relief }
+
+// IsWaterAt reports whether (x,y) resolves to the water relief.
+func (h *HeightField) IsWaterAt(x, y int) bool {
+	return h.tiles[x][y].relief == string(elementtype.Water)
+}
 
 type tile struct {
 	height int
-	elem   elementtype.ElementType
+	relief string // resolved relief key (relief_override, else height-derived)
 	zone   int
 }
 
 // Generate produces a TaleSpire slab for the resolved mask. The seed makes the
 // procedural scatter (and scattered POIs) fully reproducible.
 func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Result, error) {
+	biome := g.biomes.GetBiome(biometype.BiomeType(doc.Map.Biome))
+	if biome == nil {
+		return nil, fmt.Errorf("map biome %q is not present in the biome catalogue", doc.Map.Biome)
+	}
+	// Config-aware validation: every relief_override must exist in the biome.
+	for i := range doc.Zones {
+		if ov := doc.Zones[i].ReliefOverride; ov != "" {
+			if biome.Reliefs[elementtype.ElementType(ov)] == nil {
+				return nil, fmt.Errorf("zone %q: relief_override %q is not a relief of biome %q",
+					doc.Zones[i].ID, ov, doc.Map.Biome)
+			}
+		}
+	}
+
 	rng := rand.New(rand.NewSource(seed))
 
-	field := g.shapeTerrain(doc, mask)
+	field := shapeTerrain(doc, mask)
 	slab := &taleslabentities.Slab{}
 	res := &Result{Height: field}
 
-	g.placeGround(slab, doc, field, rng)
-	g.placeProps(slab, doc, field, rng)
+	g.placeGround(slab, biome, field, rng)
+	g.placeProps(slab, biome, doc, field, rng)
 	g.placePOIs(slab, doc, mask, field, rng, res)
 
 	res.AssetCount = len(slab.Assets)
@@ -107,9 +129,14 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 	return res, nil
 }
 
-// shapeTerrain computes per-tile height and relief type from each zone's
-// elevation intent, using a Gaussian mound/pit centred on the zone anchor.
-func (g *Generator) shapeTerrain(doc *ir.IR, mask *spatial.Mask) *HeightField {
+// shapeTerrain computes per-tile height and the resolved relief key from each
+// zone's elevation intent and optional relief_override, using a Gaussian
+// mound/pit centred on the zone anchor.
+//
+// Precedence (confirmed design): relief_override wins for the material (which
+// relief/blocks/props a tile uses); elevation still controls height. A deep
+// depression becomes water only when the zone does not override the relief.
+func shapeTerrain(doc *ir.IR, mask *spatial.Mask) *HeightField {
 	w, l := doc.Map.Width, doc.Map.Length
 	counts := mask.TileCounts()
 
@@ -151,21 +178,25 @@ func (g *Generator) shapeTerrain(doc *ir.IR, mask *spatial.Mask) *HeightField {
 			default: // flat
 				h = baseHeight
 			}
-			f.tiles[x][y] = tile{height: h, elem: elem, zone: zi}
+
+			relief := string(elem)
+			if z.ReliefOverride != "" {
+				relief = z.ReliefOverride
+			}
+			f.tiles[x][y] = tile{height: h, relief: relief, zone: zi}
 		}
 	}
 	return f
 }
 
 // placeGround stacks building blocks for every tile, filling vertical gaps down
-// to the lowest 4-neighbour so cliffs between zones/heights are solid (mirrors
-// taleslab's wall-filling behaviour, but with a per-tile biome).
-func (g *Generator) placeGround(slab *taleslabentities.Slab, doc *ir.IR, f *HeightField, rng *rand.Rand) {
+// to the lowest 4-neighbour so cliffs between heights are solid (mirrors
+// taleslab's wall-filling), using the map biome and each tile's resolved relief.
+func (g *Generator) placeGround(slab *taleslabentities.Slab, biome *taleslabentities.Biome, f *HeightField, rng *rand.Rand) {
 	for x := 0; x < f.Width; x++ {
 		for y := 0; y < f.Length; y++ {
 			t := f.tiles[x][y]
-			biome := g.biomes.GetBiome(biometype.BiomeType(doc.Zones[t.zone].Biome))
-			block := g.buildingBlock(biome, t.elem, rng)
+			block := g.buildingBlock(biome, t.relief, rng)
 			if block == nil {
 				continue
 			}
@@ -188,9 +219,10 @@ func (g *Generator) placeGround(slab *taleslabentities.Slab, doc *ir.IR, f *Heig
 	}
 }
 
-// placeProps scatters vegetation / stones / misc using each zone's biome
-// weights, modulated by density_overrides, with taleslab-style spacing.
-func (g *Generator) placeProps(slab *taleslabentities.Slab, doc *ir.IR, f *HeightField, rng *rand.Rand) {
+// placeProps scatters vegetation / stones / misc using the map biome's per-relief
+// weights, modulated by each zone's density_overrides, with taleslab-style
+// spacing.
+func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, rng *rand.Rand) {
 	occupied := make([][]bool, f.Width)
 	for x := range occupied {
 		occupied[x] = make([]bool, f.Length)
@@ -212,8 +244,7 @@ func (g *Generator) placeProps(slab *taleslabentities.Slab, doc *ir.IR, f *Heigh
 			}
 			t := f.tiles[x][y]
 			zone := &doc.Zones[t.zone]
-			biome := g.biomes.GetBiome(biometype.BiomeType(zone.Biome))
-			relief := biome.Reliefs[t.elem]
+			relief := biome.Reliefs[elementtype.ElementType(t.relief)]
 			if relief == nil || relief.PropBlocks == nil {
 				continue
 			}
@@ -280,8 +311,10 @@ func (g *Generator) placePOIs(slab *taleslabentities.Slab, doc *ir.IR, mask *spa
 	}
 }
 
-func (g *Generator) buildingBlock(b *taleslabentities.Biome, e elementtype.ElementType, rng *rand.Rand) *taleslabentities.Prop {
-	relief := b.Reliefs[e]
+// buildingBlock picks a building block for a relief key, falling back to the
+// biome's "ground" relief when the resolved relief has no building blocks.
+func (g *Generator) buildingBlock(b *taleslabentities.Biome, reliefKey string, rng *rand.Rand) *taleslabentities.Prop {
+	relief := b.Reliefs[elementtype.ElementType(reliefKey)]
 	if relief == nil || len(relief.BuildingBlocks) == 0 {
 		relief = b.Reliefs[elementtype.Ground]
 	}

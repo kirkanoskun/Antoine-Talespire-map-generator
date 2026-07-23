@@ -1,7 +1,8 @@
 // Package preview renders a top-down 2D image of a resolved map, before any
 // export to TaleSpire. This is the fast visual feedback loop from the brief
-// (section 5.6): zones are colour-coded by biome, terrain height is shaded,
-// zone borders are outlined, and points of interest are marked.
+// (section 5.6). A map has one biome, so tiles are colour-coded by their
+// resolved relief (ground, water, mountain, ruins, ...); terrain height is
+// shaded, zone borders are outlined, and points of interest are marked.
 package preview
 
 import (
@@ -16,24 +17,21 @@ import (
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
 
-// biomePalette maps a biome id to a representative top-down colour.
-var biomePalette = map[string]color.RGBA{
-	"temperate_forest":   {60, 130, 60, 255},
-	"subtropical_forest": {40, 160, 70, 255},
-	"dead_forest":        {120, 100, 70, 255},
-	"swamp":              {70, 110, 90, 255},
-	"desert":             {210, 190, 120, 255},
-	"tundra":             {225, 230, 240, 255},
-	"lava":               {170, 70, 50, 255},
-	"beach":              {230, 215, 150, 255},
+// reliefPalette maps a relief key to a representative top-down colour. Reliefs
+// not listed fall back to fallbackRelief.
+var reliefPalette = map[string]color.RGBA{
+	"water":       {60, 110, 180, 255},
+	"base_ground": {170, 160, 110, 255},
+	"ground":      {70, 130, 65, 255},
+	"mountain":    {130, 125, 120, 255},
+	"ruins":       {150, 140, 125, 255},
 }
 
 var (
-	waterColor    = color.RGBA{60, 110, 180, 255}
-	boundaryColor = color.RGBA{25, 25, 25, 255}
-	poiColor      = color.RGBA{240, 60, 200, 255}
-	anchorColor   = color.RGBA{20, 20, 20, 255}
-	fallbackBiome = color.RGBA{150, 150, 150, 255}
+	boundaryColor  = color.RGBA{25, 25, 25, 255}
+	poiColor       = color.RGBA{240, 60, 200, 255}
+	anchorColor    = color.RGBA{20, 20, 20, 255}
+	fallbackRelief = color.RGBA{150, 150, 150, 255}
 )
 
 // Options configures rendering.
@@ -54,10 +52,8 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 
 	for x := 0; x < w; x++ {
 		for y := 0; y < l; y++ {
-			base := colorFor(doc, mask, x, y)
-			if field.IsWaterAt(x, y) {
-				base = waterColor
-			} else {
+			base := colorFor(field, x, y)
+			if !field.IsWaterAt(x, y) {
 				base = shade(base, field.HeightAt(x, y), minH, maxH)
 			}
 			if mask.IsBoundary(x, y) {
@@ -95,12 +91,11 @@ func SavePNG(path string, doc *ir.IR, mask *spatial.Mask, field *generator.Heigh
 	return WritePNG(f, doc, mask, field, opts)
 }
 
-func colorFor(doc *ir.IR, mask *spatial.Mask, x, y int) color.RGBA {
-	z := mask.ZoneAt(x, y)
-	if c, ok := biomePalette[z.Biome]; ok {
+func colorFor(field *generator.HeightField, x, y int) color.RGBA {
+	if c, ok := reliefPalette[field.ReliefAt(x, y)]; ok {
 		return c
 	}
-	return fallbackBiome
+	return fallbackRelief
 }
 
 func heightRange(f *generator.HeightField) (int, int) {
