@@ -1,0 +1,19 @@
+{
+  "map": { "width": 40, "length": 40, "name": "Two zones, one border" },
+  "zones": [
+    {
+      "id": "west_forest",
+      "biome": "temperate_forest",
+      "anchor": { "x": 10, "y": 20 },
+      "relative_size": 0.5,
+      "elevation": "flat"
+    },
+    {
+      "id": "east_desert",
+      "biome": "desert",
+      "anchor": { "x": 30, "y": 20 },
+      "relative_size": 0.5,
+      "elevation": "flat"
+    }
+  ]
+}
