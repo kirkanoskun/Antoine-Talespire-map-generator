@@ -93,13 +93,15 @@ What taleslab does **not** do, and is the real subject of this project:
 
 ## Phases
 
-- **Phase 1 — foundation (DONE, this is where we are).** Import taleslab, write
-  per-zone generation within one biome (relief/density modulation bounded to each
-  zone's perimeter), validate two distinct zones of the same biome side by side
-  (no careful transition yet).
-- **Phase 2 — IR + NL.** Finalise the IR schema, build the Claude prompt/call
-  that turns a description into valid IR, with strict schema validation + retry.
-  Test on ~10 varied descriptions.
+- **Phase 1 — foundation (DONE).** Import taleslab, write per-zone generation
+  within one biome (relief/density modulation bounded to each zone's perimeter),
+  validate two distinct zones of the same biome side by side (no careful
+  transition yet).
+- **Phase 2 — IR + NL (DONE, this is where we are).** IR schema finalised; a
+  Claude API call (`internal/nl`) turns a French description into valid IR with
+  strict schema + biome/relief validation and retry (invalid output is fed back
+  to the model). `cmd/describe` runs description → IR → map end to end. Evaluated
+  on ~10 varied descriptions via a live test gated on `ANTHROPIC_API_KEY`.
 - **Phase 3 — spatial resolution + stitching.** Zone placement algorithm and the
   border transition logic (the riskiest part). Prototype early with the simple
   case: two zones, one straight border.
@@ -108,23 +110,31 @@ What taleslab does **not** do, and is the real subject of this project:
 - **Phase 5 — export + polish.** `talescoder` integration end-to-end, real
   TaleSpire import tests.
 
-## Current implementation (Phase 1)
+## Current implementation (Phases 1–2)
 
 ```
 cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
+cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
 internal/ir/          IR types, strict JSON parsing & validation
 internal/spatial/     weighted-Voronoi zone mask resolver
 internal/generator/   zone-aware slab generation + deterministic encoder mapper
 internal/preview/     top-down 2D PNG renderer
+internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry
 configs/              biomes.json, props.json (copied from taleslab)
-testdata/             castle.json (brief example), twozones.json (acceptance)
+testdata/             castle.json, twozones.json, descriptions.txt (NL eval)
 ```
 
 Run it:
 
 ```
+# Phase 1: IR -> map
 go run ./cmd/generate -input testdata/castle.json -out out/castle.txt -preview out/castle.png
-go test ./...
+
+# Phase 2: description -> map (needs ANTHROPIC_API_KEY)
+go run ./cmd/describe -description "une clairière au bord d'un étang" -code out/x.txt -preview out/x.png
+
+go test ./...                                   # offline; live NL eval skips without a key
+ANTHROPIC_API_KEY=... go test ./internal/nl/    # runs the ~10-description eval
 ```
 
 ### Key design decisions & notes
@@ -155,6 +165,17 @@ go test ./...
   descriptive POI names ("broken_pillar", "altar") are mapped to real prop ids
   via `internal/generator/aliases.go`. Unknown props become warnings, never
   silent drops.
+- **NL layer is provider-abstracted and validated (Phase 2).** `internal/nl`
+  splits the model call (`Completer` interface; `AnthropicCompleter` is the only
+  implementation) from the validate-and-retry loop, so the loop is unit-tested
+  offline with a fake completer. The model gets the one-biome rule, the JSON
+  schema, and a **catalogue** (each biome's real relief keys + the POI
+  vocabulary) in a cache-marked system prompt. Output is parsed with `ir.Parse`
+  and checked for biome/relief coherence; on any failure the exact error is fed
+  back and the model retries (default 2 extra attempts). No structured-output
+  schema — the IR's union/​map fields don't fit JSON-schema constraints, and
+  validate+retry is what the brief asks for. Default model `claude-opus-4-8`
+  with adaptive thinking.
 - **Single slab.** Phase 1 emits one slab for the whole map. taleslab slices at
   50 tiles; large maps may need slicing for the TaleSpire editor (revisit with
   TaleSpire's documented limits — brief section 8).

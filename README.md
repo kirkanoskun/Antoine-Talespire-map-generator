@@ -16,24 +16,32 @@ biome — they only modulate, within it, the prop density, the relief used (via
 cover yet (e.g. ruins) are added as a new relief to that biome in
 `configs/biomes.json`, never by borrowing a different biome.
 
-## Status: Phase 1 — zone-aware generation
+## Status: Phases 1–2 — natural language to map
 
-The engine turns a level-design **intermediate representation (IR)** into a
-TaleSpire slab, generating each zone with the map's biome but its own
-relief/densities, and stitching them into a single map:
+Describe a scene in French; the engine turns it into a level-design
+**intermediate representation (IR)**, resolves the IR into a TaleSpire slab
+(each zone in the map's single biome with its own relief/densities), and renders
+a preview:
 
 ```
-IR (JSON)  ->  weighted-Voronoi zone mask  ->  per-tile zone-aware slab  ->  base64 code
+description  ->  Claude (validate + retry)  ->  IR (JSON)
+IR (JSON)    ->  weighted-Voronoi zone mask ->  per-tile zone-aware slab  ->  base64 code
                                             \->  2D top-down PNG preview
 ```
 
-Natural language (Phase 2), border transitions (Phase 3) and the web UI
-(Phase 4) are not implemented yet.
+Border transitions (Phase 3) and the web UI (Phase 4) are not implemented yet.
 
 ## Quick start
 
 ```bash
-# Generate a TaleSpire code + a preview PNG from the example IR
+# Phase 2 — from a French description (needs ANTHROPIC_API_KEY)
+go run ./cmd/describe \
+  -description "une cour de château en ruines, une mare au sud, des vestiges au nord" \
+  -out out/castle.ir.json \
+  -code out/castle.txt \
+  -preview out/castle.png
+
+# Phase 1 — from a hand-written IR
 go run ./cmd/generate \
   -input testdata/castle.json \
   -out out/castle.txt \
@@ -41,8 +49,25 @@ go run ./cmd/generate \
 
 # Paste the contents of out/castle.txt into TaleSpire.
 
-go test ./...
+go test ./...                                 # offline; the live NL eval skips without a key
+ANTHROPIC_API_KEY=... go test ./internal/nl/  # runs the ~10-description eval
 ```
+
+### `describe` flags
+
+| flag                 | default            | meaning                                  |
+|----------------------|--------------------|------------------------------------------|
+| `-description`       | *(required*)       | the scene, in natural language           |
+| `-description-file`  | —                  | read the description from a file instead |
+| `-width` / `-length` | `50`               | map size in tiles                        |
+| `-biome`             | *(model chooses)*  | force the map biome                      |
+| `-model`             | `claude-opus-4-8`  | Claude model id                          |
+| `-max-retries`       | `2`                | retries on invalid IR                    |
+| `-out`               | stdout             | write the IR JSON                        |
+| `-code` / `-preview` | —                  | also generate the slab / PNG            |
+
+The interpreter validates the model's IR strictly (schema + biome/relief
+coherence) and, on any failure, feeds the exact error back and retries.
 
 ### CLI flags
 
@@ -103,13 +128,15 @@ with a pond and northern ruins).
 ## Project layout
 
 ```
-cmd/generate/         CLI entry point
+cmd/generate/         CLI: IR -> map
+cmd/describe/         CLI: description -> IR -> map
 internal/ir/          IR types, strict parsing & validation
 internal/spatial/     weighted-Voronoi zone mask
 internal/generator/   zone-aware slab generation + deterministic encoding
 internal/preview/     top-down 2D PNG renderer
+internal/nl/          natural language -> IR (Claude call, validate + retry)
 configs/              biome & prop catalogues (from taleslab)
-testdata/             example IR documents
+testdata/             example IR documents + NL descriptions
 ```
 
 ## License

@@ -1,0 +1,12 @@
+# One French scene description per line (blank lines and #-comments ignored).
+# Used by the live NL eval (internal/nl/live_test.go), which requires ANTHROPIC_API_KEY.
+une cour de château en ruines, avec une mare au centre et des arbres morts autour, un chemin qui monte vers des vestiges au nord
+une clairière paisible dans une forêt tempérée, avec un gros rocher au milieu et des buissons épars
+un campement au bord d'un étang, entouré d'arbres, avec un feu de camp au centre
+une colline boisée qui domine une plaine herbeuse au sud
+un marais brumeux avec de l'eau stagnante et quelques îlots de terre ferme
+un désert de dunes avec une oasis au centre et des cactus dispersés
+une toundra enneigée avec une crête rocheuse à l'est
+une plage de sable qui borde une forêt de pins, avec des rochers près de l'eau
+des ruines antiques envahies par la végétation, avec un autel au centre et quatre colonnes brisées autour
+une vallée encaissée entre deux montagnes, avec une rivière qui la traverse

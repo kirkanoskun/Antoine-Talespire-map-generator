@@ -1,5 +1,7 @@
 package generator
 
+import "sort"
+
 // propAliases maps friendly / descriptive point-of-interest names (the kind a
 // language model or a user is likely to produce, e.g. "broken_pillar") onto the
 // concrete prop ids that exist in configs/props.json.
@@ -37,4 +39,16 @@ func resolvePropAlias(name string) string {
 		return id
 	}
 	return name
+}
+
+// POIAliasNames returns the sorted set of friendly point-of-interest names the
+// generator understands (the keys of the alias table). The NL layer (package
+// nl) feeds these to the model so it prefers vocabulary that resolves cleanly.
+func POIAliasNames() []string {
+	names := make([]string, 0, len(propAliases))
+	for name := range propAliases {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
