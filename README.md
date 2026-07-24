@@ -16,17 +16,18 @@ biome — they only modulate, within it, the prop density, the relief used (via
 cover yet (e.g. ruins) are added as a new relief to that biome in
 `configs/biomes.json`, never by borrowing a different biome.
 
-## Status: Phases 1–2 — natural language to map
+## Status: Phases 1–4 — natural language to map, with a web UI
 
 Describe a scene in French; the engine turns it into a level-design
 **intermediate representation (IR)**, resolves the IR into a TaleSpire slab
-(each zone in the map's single biome with its own relief/densities), and renders
-a preview:
+(each zone in the map's single biome with its own relief/densities), renders a
+preview, and lets you adjust it conversationally in the browser:
 
 ```
 description  ->  Claude (validate + retry)  ->  IR (JSON)
 IR (JSON)    ->  weighted-Voronoi zone mask ->  border stitching  ->  slab  ->  base64 code
                                             \->  2D top-down PNG preview
+adjustment   ->  Claude edits the in-memory IR  ->  re-render
 ```
 
 The spatial layer is complete: adjacent zones are **stitched** (height and prop
@@ -39,6 +40,10 @@ implemented yet.
 ## Quick start
 
 ```bash
+# Phase 4 — web UI: describe, preview, adjust, export (needs ANTHROPIC_API_KEY
+# for the description/adjust features; the "apply edited IR" path works offline)
+go run ./cmd/server        # http://localhost:8080
+
 # Phase 2 — from a French description (needs ANTHROPIC_API_KEY)
 go run ./cmd/describe \
   -description "une cour de château en ruines, une mare au sud, des vestiges au nord" \
@@ -140,11 +145,13 @@ with a pond and northern ruins).
 ```
 cmd/generate/         CLI: IR -> map
 cmd/describe/         CLI: description -> IR -> map
+cmd/server/           HTTP server for the web UI
 internal/ir/          IR types, strict parsing & validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
 internal/generator/   zone-aware slab generation, stitching, paths, encoding
 internal/preview/     top-down 2D PNG renderer
-internal/nl/          natural language -> IR (Claude call, validate + retry)
+internal/nl/          natural language -> IR (Claude call, validate + retry, adjust)
+internal/server/      HTTP API + embedded single-page UI, in-memory sessions
 configs/              biome & prop catalogues (from taleslab)
 testdata/             example IR documents + NL descriptions
 ```

@@ -112,8 +112,12 @@ What taleslab does **not** do, and is the real subject of this project:
   `testdata/nested.json`). (3) **Connection carving** — `connections` become
   bare, leveled corridors that ramp in height between zones (`spatial.BuildPaths`,
   `generator.carvePaths`).
-- **Phase 4 — UI + iteration loop.** 2D render, web UI, in-memory IR for
-  conversational adjustments.
+- **Phase 4 — UI + iteration loop (DONE, this is where we are).** A Go HTTP
+  server (`internal/server`, `cmd/server`) serves a single-page web UI: describe
+  a scene, see the 2D preview, adjust it conversationally, copy the TaleSpire
+  code. The IR is kept **in memory per session**, so a follow-up ("move the pond
+  south") is `nl.Adjust` — a targeted edit of the current IR — not a fresh
+  generation. The server drives the exact same pipeline as the CLIs.
 - **Phase 5 — export + polish.** `talescoder` integration end-to-end, real
   TaleSpire import tests.
 
@@ -122,11 +126,13 @@ What taleslab does **not** do, and is the real subject of this project:
 ```
 cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
 cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
+cmd/server/           HTTP server for the web UI
 internal/ir/          IR types, strict JSON parsing & validation
-internal/spatial/     weighted-Voronoi zone mask + border transition bands
-internal/generator/   zone-aware slab generation, stitching, deterministic mapper
+internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
+internal/generator/   zone-aware slab generation, stitching, paths, mapper
 internal/preview/     top-down 2D PNG renderer
-internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry
+internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry, Adjust
+internal/server/      HTTP API + embedded single-page UI, in-memory sessions
 configs/              biomes.json, props.json (copied from taleslab)
 testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
@@ -142,6 +148,9 @@ go run ./cmd/describe -description "une clairière au bord d'un étang" -code ou
 
 go test ./...                                   # offline; live NL eval skips without a key
 ANTHROPIC_API_KEY=... go test ./internal/nl/    # runs the ~10-description eval
+
+# Phase 4: web UI (describe, preview, adjust, export) at http://localhost:8080
+ANTHROPIC_API_KEY=... go run ./cmd/server
 ```
 
 ### Key design decisions & notes
@@ -186,6 +195,24 @@ ANTHROPIC_API_KEY=... go test ./internal/nl/    # runs the ~10-description eval
 - **Single slab.** Phase 1 emits one slab for the whole map. taleslab slices at
   50 tiles; large maps may need slicing for the TaleSpire editor (revisit with
   TaleSpire's documented limits — brief section 8).
+
+### Phase 4 web UI & iteration notes
+
+- **Same pipeline, driven over HTTP.** `internal/server` wires the existing
+  generator/spatial/preview/nl packages; no generation logic lives in the server.
+  `/api/describe` (NL → IR), `/api/adjust` (edit the session IR), `/api/generate`
+  (accept an edited IR directly, no LLM), `/api/preview` (PNG). The single-page
+  UI is embedded via `go:embed` — one binary, no external assets.
+- **In-memory sessions = the iteration loop.** Each session holds the current
+  IR. An adjustment ("move the pond south") calls `nl.Adjust`, which hands the
+  model the current IR + the instruction and asks for the full updated IR,
+  validated by the same validate+retry loop. Regeneration is cheap (ms), so the
+  brief's "re-run only affected zones" is unnecessary for compute; the value of
+  keeping the IR is that edits are *relative to the current map*, not a fresh
+  description. The `/api/generate` path also lets the UI apply hand-edited IR.
+- **Runs without a key.** With no Anthropic credential the server still serves
+  the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
+  `/api/adjust` return 503 with a clear message.
 
 ### Phase 3 stitching notes
 

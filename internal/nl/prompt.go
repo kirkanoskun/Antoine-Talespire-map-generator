@@ -88,3 +88,16 @@ func userPrompt(description string, width, length int, name, forcedBiome string)
 	b.WriteString(strings.TrimSpace(description))
 	return b.String()
 }
+
+// adjustPrompt frames a conversational edit: the current IR plus the change to
+// apply. The model must return the whole updated IR (same rules), changing only
+// what the instruction asks for.
+func adjustPrompt(currentIR, message string) string {
+	var b strings.Builder
+	b.WriteString("Here is the current map IR:\n")
+	b.WriteString(currentIR)
+	b.WriteString("\n\nApply this adjustment, changing only what it asks for and keeping everything else intact:\n")
+	b.WriteString(strings.TrimSpace(message))
+	b.WriteString("\n\nReturn the full updated IR as JSON only.")
+	return b.String()
+}

@@ -2,6 +2,7 @@ package nl
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -73,12 +74,46 @@ func (in *Interpreter) Interpret(ctx context.Context, description string, opts O
 		return nil, fmt.Errorf("forced biome %q is not in the catalogue", opts.ForcedBiome)
 	}
 
-	system := in.catalog.systemPrompt()
 	messages := []Message{{
 		Role: "user",
 		Text: userPrompt(description, opts.Width, opts.Length, opts.Name, opts.ForcedBiome),
 	}}
+	return in.run(ctx, messages, opts)
+}
 
+// Adjust applies a conversational follow-up ("move the pond further south") to
+// an existing IR. It hands the model the current IR plus the instruction and
+// asks for the full updated IR, then validates and retries exactly like
+// Interpret. This is the in-memory iteration loop of the brief (5.8): a targeted
+// edit of the current IR rather than a fresh generation.
+func (in *Interpreter) Adjust(ctx context.Context, current *ir.IR, message string, opts Options) (*Result, error) {
+	if current == nil {
+		return nil, fmt.Errorf("no current IR to adjust")
+	}
+	if strings.TrimSpace(message) == "" {
+		return nil, fmt.Errorf("adjustment message is empty")
+	}
+	if opts.Width <= 0 {
+		opts.Width = current.Map.Width
+	}
+	if opts.Length <= 0 {
+		opts.Length = current.Map.Length
+	}
+	if opts.MaxRetries < 0 {
+		opts.MaxRetries = 0
+	}
+
+	currentJSON, err := json.MarshalIndent(current, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshalling current IR: %w", err)
+	}
+	messages := []Message{{Role: "user", Text: adjustPrompt(string(currentJSON), message)}}
+	return in.run(ctx, messages, opts)
+}
+
+// run executes the validate-and-retry loop over a seeded conversation.
+func (in *Interpreter) run(ctx context.Context, messages []Message, opts Options) (*Result, error) {
+	system := in.catalog.systemPrompt()
 	res := &Result{}
 	for attempt := 0; attempt <= opts.MaxRetries; attempt++ {
 		raw, err := in.completer.Complete(ctx, system, messages)

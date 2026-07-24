@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TaleSpire map generator</title>
+<style>
+  :root { --bg:#1e2127; --panel:#282c34; --ink:#e6e6e6; --muted:#9aa4b2; --accent:#6ca06c; --border:#3a3f4b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); }
+  header h1 { margin:0; font-size:17px; font-weight:600; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  main { display:grid; grid-template-columns: 380px 1fr; gap:16px; padding:16px; align-items:start; }
+  @media (max-width: 860px){ main { grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; }
+  .panel h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  textarea, input, select { width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--border); border-radius:6px; padding:8px; font:inherit; }
+  textarea { resize:vertical; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  button { background:var(--accent); color:#0e1a0e; border:0; border-radius:6px; padding:9px 12px; font-weight:600; cursor:pointer; }
+  button.secondary { background:transparent; color:var(--ink); border:1px solid var(--border); }
+  button:disabled { opacity:.5; cursor:default; }
+  .preview { display:flex; align-items:center; justify-content:center; min-height:320px; background:var(--bg); border:1px solid var(--border); border-radius:6px; }
+  .preview img { max-width:100%; image-rendering:pixelated; border-radius:4px; }
+  .muted { color:var(--muted); font-size:13px; }
+  #chat { max-height:220px; overflow:auto; margin-bottom:8px; }
+  .msg { padding:6px 9px; border-radius:6px; margin:4px 0; font-size:14px; }
+  .msg.user { background:#31363f; }
+  .msg.sys { background:transparent; color:var(--muted); font-size:13px; }
+  .msg.err { background:#4a2b2b; color:#ffbdbd; }
+  code, pre { font-family: ui-monospace, monospace; }
+  pre#code { white-space:pre-wrap; word-break:break-all; max-height:120px; overflow:auto; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px; }
+  .spin { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>TaleSpire map generator</h1>
+  <p>Décris une scène en français, ajuste-la à la conversation, exporte le code TaleSpire.</p>
+</header>
+
+<main>
+  <section class="panel" style="display:flex; flex-direction:column; gap:10px;">
+    <div>
+      <h2>Décrire</h2>
+      <label for="desc">Description</label>
+      <textarea id="desc" rows="4" placeholder="une cour de château en ruines, une mare au centre, un chemin qui monte vers des vestiges au nord"></textarea>
+      <div class="row">
+        <div><label for="w">Largeur</label><input id="w" type="number" value="50" min="8" max="200"></div>
+        <div><label for="l">Longueur</label><input id="l" type="number" value="50" min="8" max="200"></div>
+        <div><label for="biome">Biome (option)</label>
+          <select id="biome">
+            <option value="">auto</option>
+            <option>temperate_forest</option><option>subtropical_forest</option>
+            <option>dead_forest</option><option>swamp</option><option>desert</option>
+            <option>tundra</option><option>lava</option><option>beach</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;"><button id="gen">Générer</button></div>
+    </div>
+
+    <div>
+      <h2>Ajuster</h2>
+      <div id="chat"></div>
+      <div class="row">
+        <input id="adjust" placeholder="déplace la mare plus au sud" style="flex:3;">
+        <button id="send" class="secondary" style="flex:1;">Envoyer</button>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex; flex-direction:column; gap:16px;">
+    <div class="panel">
+      <h2>Aperçu 2D</h2>
+      <div class="preview" id="preview"><span class="muted">Aucune carte pour l'instant.</span></div>
+    </div>
+    <div class="panel">
+      <h2>Code TaleSpire <button id="copy" class="secondary" style="float:right; padding:4px 10px;">Copier</button></h2>
+      <pre id="code" class="muted">—</pre>
+    </div>
+    <div class="panel">
+      <h2>IR (éditable)</h2>
+      <textarea id="ir" rows="10" spellcheck="false" class="muted"></textarea>
+      <div style="margin-top:8px;"><button id="apply" class="secondary">Appliquer l'IR édité</button></div>
+    </div>
+  </section>
+</main>
+
+<script>
+let session = "";
+
+const $ = (id) => document.getElementById(id);
+const chat = $("chat");
+
+function log(text, cls) {
+  const d = document.createElement("div");
+  d.className = "msg " + (cls || "sys");
+  d.textContent = text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function busy(on) {
+  for (const b of document.querySelectorAll("button")) b.disabled = on;
+}
+
+async function postJSON(url, body) {
+  const r = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  return data;
+}
+
+function render(data) {
+  session = data.session;
+  $("preview").innerHTML = "";
+  const img = new Image();
+  img.src = data.preview_url;
+  $("preview").appendChild(img);
+  $("code").textContent = data.code;
+  $("code").classList.remove("muted");
+  $("ir").value = JSON.stringify(data.ir, null, 2);
+  if (data.warnings && data.warnings.length) data.warnings.forEach(w => log("⚠ " + w, "err"));
+}
+
+$("gen").onclick = async () => {
+  const description = $("desc").value.trim();
+  if (!description) return;
+  busy(true); log("Génération : " + description, "user");
+  try {
+    const data = await postJSON("/api/describe", {
+      description, width:+$("w").value, length:+$("l").value, biome:$("biome").value,
+    });
+    render(data);
+    if (data.attempts > 1) log("IR valide après " + data.attempts + " tentatives.");
+    else log("Carte générée.");
+  } catch (e) { log("Erreur : " + e.message, "err"); }
+  busy(false);
+};
+
+$("send").onclick = async () => {
+  const message = $("adjust").value.trim();
+  if (!message) return;
+  if (!session) { log("Génère d'abord une carte.", "err"); return; }
+  busy(true); log(message, "user"); $("adjust").value = "";
+  try {
+    render(await postJSON("/api/adjust", { session, message }));
+    log("Ajustement appliqué.");
+  } catch (e) { log("Erreur : " + e.message, "err"); }
+  busy(false);
+};
+
+$("adjust").addEventListener("keydown", (e) => { if (e.key === "Enter") $("send").click(); });
+
+$("apply").onclick = async () => {
+  let parsed;
+  try { parsed = JSON.parse($("ir").value); }
+  catch (e) { log("IR invalide : " + e.message, "err"); return; }
+  busy(true);
+  try { render(await postJSON("/api/generate", { session, ir: parsed })); log("IR appliqué."); }
+  catch (e) { log("Erreur : " + e.message, "err"); }
+  busy(false);
+};
+
+$("copy").onclick = async () => {
+  const code = $("code").textContent;
+  if (!code || code === "—") return;
+  try { await navigator.clipboard.writeText(code); log("Code copié dans le presse-papier."); }
+  catch { log("Copie impossible (permission).", "err"); }
+};
+</script>
+</body>
+</html>
