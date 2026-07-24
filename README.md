@@ -16,7 +16,7 @@ biome — they only modulate, within it, the prop density, the relief used (via
 cover yet (e.g. ruins) are added as a new relief to that biome in
 `configs/biomes.json`, never by borrowing a different biome.
 
-## Status: Phases 1–4 — natural language to map, with a web UI
+## Status: Phases 1–5 — natural language to map, web UI, export
 
 Describe a scene in French; the engine turns it into a level-design
 **intermediate representation (IR)**, resolves the IR into a TaleSpire slab
@@ -34,8 +34,9 @@ The spatial layer is complete: adjacent zones are **stitched** (height and prop
 density smoothed across a band at each border; the material relief stays crisp),
 a small zone sharing a larger zone's anchor is **nested** as a disc (a pond at
 the courtyard centre), and **connections** are carved into bare corridors that
-ramp between zones. The web UI and conversational iteration (Phase 4) are not
-implemented yet.
+ramp between zones. For export, large maps are **sliced** into a grid of slabs,
+each under TaleSpire's ~30 kB limit (`-slice`); the only remaining step is
+pasting the code(s) into an actual TaleSpire client.
 
 ## Quick start
 
@@ -91,6 +92,7 @@ coherence) and, on any failure, feeds the exact error back and retries.
 | `-scale`   | `8`                  | preview pixels per tile                  |
 | `-seed`    | `1`                  | seed for reproducible generation         |
 | `-transition` | `3`               | border stitching half-width (0 = hard)   |
+| `-slice`   | `0`                  | slice into ≤N-tile slabs (0 = single)    |
 
 ## The IR format
 

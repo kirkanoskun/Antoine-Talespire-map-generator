@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
@@ -32,6 +33,7 @@ func main() {
 	scale := flag.Int("scale", 8, "preview pixels per tile")
 	seed := flag.Int64("seed", 1, "random seed for reproducible generation")
 	transition := flag.Int("transition", 3, "zone-border stitching half-width in tiles (0 = hard borders)")
+	slice := flag.Int("slice", 0, "slice the map into slabs of at most N tiles per side (0 = single slab)")
 	flag.Parse()
 
 	if *input == "" {
@@ -55,6 +57,7 @@ func main() {
 		log.Fatalf("initialising generator: %v", err)
 	}
 	gen.SetTransitionHalfWidth(*transition)
+	gen.SetSliceSize(*slice)
 	res, err := gen.Generate(doc, mask, *seed)
 	if err != nil {
 		log.Fatalf("generating: %v", err)
@@ -83,7 +86,21 @@ func main() {
 		if err := os.WriteFile(*out, []byte(res.Code), 0o644); err != nil {
 			log.Fatalf("writing code: %v", err)
 		}
-		log.Printf("TaleSpire code written to %s", *out)
+		log.Printf("TaleSpire code written to %s (%d bytes)", *out, len(res.Code))
+		// When sliced, write each slab next to -out as <base>.<x>_<y>.<ext>.
+		if res.Slices != nil {
+			ext := filepath.Ext(*out)
+			base := strings.TrimSuffix(*out, ext)
+			for sx := range res.Slices {
+				for sy := range res.Slices[sx] {
+					p := fmt.Sprintf("%s.%d_%d%s", base, sx, sy, ext)
+					if err := os.WriteFile(p, []byte(res.Slices[sx][sy]), 0o644); err != nil {
+						log.Fatalf("writing slice: %v", err)
+					}
+				}
+			}
+			log.Printf("wrote %dx%d slices next to %s", len(res.Slices), len(res.Slices[0]), *out)
+		}
 	}
 
 	log.Printf("generated %q: %d zones, %d assets, %d tiles",

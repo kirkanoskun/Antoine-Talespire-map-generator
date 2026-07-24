@@ -27,6 +27,7 @@ func main() {
 	scale := flag.Int("scale", 8, "preview pixels per tile")
 	seed := flag.Int64("seed", 1, "generation seed")
 	transition := flag.Int("transition", 3, "zone-border stitching half-width (0 = hard)")
+	slice := flag.Int("slice", 0, "slice maps into slabs of at most N tiles per side (0 = single slab)")
 	flag.Parse()
 
 	gen, err := generator.New(*biomes, *props)
@@ -46,6 +47,7 @@ func main() {
 		PreviewScale: *scale,
 		MaxRetries:   *maxRetries,
 		Seed:         *seed,
+		SliceSize:    *slice,
 	})
 
 	log.Printf("listening on %s", *addr)

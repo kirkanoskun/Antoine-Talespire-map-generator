@@ -3,6 +3,7 @@ package generator
 import (
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/johnfercher/talescoder/pkg/decoder"
@@ -128,6 +129,73 @@ func TestWaterInDepression(t *testing.T) {
 	// The centre of a large depression should be water.
 	if !res.Height.IsWaterAt(15, 15) {
 		t.Error("expected water at the centre of a depression zone")
+	}
+}
+
+// TestSlicingProducesDecodableGrid checks that a sliced map yields the right
+// grid, every slice decodes, and no placement is lost or duplicated.
+func TestSlicingProducesDecodableGrid(t *testing.T) {
+	doc, err := ir.Parse([]byte(`{
+		"map":{"width":60,"length":60,"name":"t","biome":"temperate_forest"},
+		"zones":[{"id":"a","anchor":{"x":30,"y":30},"relative_size":1.0,"elevation":"hill","density_overrides":{"vegetation":0.2}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := newTestGen(t)
+	g.SetSliceSize(25) // 60/25 -> 3 slices per side
+
+	res, err := g.Generate(doc, spatial.Resolve(doc), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Slices) != 3 || len(res.Slices[0]) != 3 {
+		t.Fatalf("expected a 3x3 slice grid, got %dx%d", len(res.Slices), len(res.Slices[0]))
+	}
+
+	dec := decoder.NewDecoder()
+	totalLayouts := 0
+	for sx := range res.Slices {
+		for sy := range res.Slices[sx] {
+			slab, err := dec.Decode(res.Slices[sx][sy])
+			if err != nil {
+				t.Fatalf("slice [%d,%d] did not decode: %v", sx, sy, err)
+			}
+			for _, a := range slab.Assets {
+				totalLayouts += len(a.Layouts)
+			}
+		}
+	}
+	// Every placed asset lands in exactly one slice: the layouts summed across
+	// slices must equal the whole-map asset count.
+	if totalLayouts != res.AssetCount {
+		t.Errorf("slices hold %d layouts, whole map has %d assets", totalLayouts, res.AssetCount)
+	}
+}
+
+// TestOversizedSlabWarns checks that a whole-map slab over TaleSpire's ~30 kB
+// limit is flagged when slicing is off.
+func TestOversizedSlabWarns(t *testing.T) {
+	doc, err := ir.Parse([]byte(`{
+		"map":{"width":110,"length":110,"name":"t","biome":"temperate_forest"},
+		"zones":[{"id":"a","anchor":{"x":55,"y":55},"relative_size":1.0,"elevation":"hill"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := newTestGen(t).Generate(doc, spatial.Resolve(doc), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Code) <= TaleSpireSlabLimitBytes {
+		t.Skipf("map not large enough to exceed the limit (%d bytes)", len(res.Code))
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "limit") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected an oversize warning, got %v", res.Warnings)
 	}
 }
 

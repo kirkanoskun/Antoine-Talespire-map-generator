@@ -55,6 +55,7 @@ type Options struct {
 	PreviewScale int
 	MaxRetries   int
 	Seed         int64
+	SliceSize    int
 }
 
 // New builds a server around a generator and (optionally) an NL interpreter.
@@ -63,6 +64,7 @@ func New(gen *generator.Generator, opts Options) *Server {
 	if scale <= 0 {
 		scale = 8
 	}
+	gen.SetSliceSize(opts.SliceSize)
 	return &Server{
 		gen:         gen,
 		interp:      opts.Interpreter,
@@ -88,6 +90,7 @@ type genResponse struct {
 	Session    string          `json:"session"`
 	IR         json.RawMessage `json:"ir"`
 	Code       string          `json:"code"`
+	Slices     [][]string      `json:"slices,omitempty"`
 	Warnings   []string        `json:"warnings"`
 	Attempts   int             `json:"attempts"`
 	PreviewURL string          `json:"preview_url"`
@@ -240,6 +243,7 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 		Session:    id,
 		IR:         irJSON,
 		Code:       res.Code,
+		Slices:     res.Slices,
 		Warnings:   res.Warnings,
 		Attempts:   attempts,
 		PreviewURL: fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),

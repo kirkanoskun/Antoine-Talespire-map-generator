@@ -81,7 +81,8 @@ What taleslab does **not** do, and is the real subject of this project:
    density blending).
 6. **2D preview**: top-down image (colour per biome, height shading, POI markers)
    generated before any TaleSpire export. Enables the fast iteration loop.
-7. **TaleSpire export**: encode the slab to the base64 blob via `talescoder`.
+7. **TaleSpire export**: encode the slab to the base64 blob via `talescoder`;
+   slice into ≤30 kB slabs for large maps (Phase 5).
 8. **Conversational iteration**: each follow-up ("move the pond further south")
    is a targeted edit of the in-memory IR, re-running only affected zones — not
    a full regeneration.
@@ -118,8 +119,14 @@ What taleslab does **not** do, and is the real subject of this project:
   code. The IR is kept **in memory per session**, so a follow-up ("move the pond
   south") is `nl.Adjust` — a targeted edit of the current IR — not a fresh
   generation. The server drives the exact same pipeline as the CLIs.
-- **Phase 5 — export + polish.** `talescoder` integration end-to-end, real
-  TaleSpire import tests.
+- **Phase 5 — export + polish (DONE, this is where we are).** `talescoder`
+  integration is end-to-end (all outputs round-trip through the real decoder in
+  tests). TaleSpire's real limit is **~30 kB per slab** (a bigger slab pastes but
+  fails on save / board switch — [FAQ](https://talespire.com/faq)), so the
+  generator can **slice** a map into a grid of local-origin slabs
+  (`SetSliceSize`, `-slice`), and warns when a single slab exceeds the limit.
+  Remaining is manual: importing a generated code into an actual TaleSpire client
+  (cannot be automated here).
 
 ## Current implementation (Phases 1–2)
 
@@ -192,9 +199,13 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   schema — the IR's union/​map fields don't fit JSON-schema constraints, and
   validate+retry is what the brief asks for. Default model `claude-opus-4-8`
   with adaptive thinking.
-- **Single slab.** Phase 1 emits one slab for the whole map. taleslab slices at
-  50 tiles; large maps may need slicing for the TaleSpire editor (revisit with
-  TaleSpire's documented limits — brief section 8).
+- **Slicing for TaleSpire's ~30 kB limit (Phase 5).** A slab over ~30 kB pastes
+  but fails on save / board switch. `Generate` always produces the whole-map
+  `Code` (and warns if it's oversized); with `SetSliceSize(n)` it also returns a
+  grid of slabs of ≤ n tiles per side (`Result.Slices`), each rebased to its own
+  local origin so they paste adjacent. Coordinates deferred as `placement`s make
+  this a pure re-bucketing — single-slab output is byte-identical whether or not
+  slicing is enabled.
 
 ### Phase 4 web UI & iteration notes
 
@@ -251,9 +262,12 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - Spatial resolution (steps 3 & 5) — DONE: stitching, nested zones, connection
   carving. Possible future work: Voronoi relaxation for rounder cells, and paths
   that route around obstacles rather than straight lines.
-- IR reliability: validate the model's IR strictly server-side, retry on invalid.
-- Claude API call count/cost per session (one initial + one per adjustment).
-- TaleSpire's real max map size — verify before defaulting to large maps.
+- IR reliability: validate the model's IR strictly server-side, retry on invalid
+  — DONE (`internal/nl`).
+- Claude API call count/cost per session (one initial + one per adjustment) —
+  still worth watching; the system prompt is cache-marked to reduce cost.
+- TaleSpire's max slab size — RESOLVED: ~30 kB per slab, slicing implemented.
+  The one remaining unautomatable step is importing a code into a real client.
 
 ## Conventions
 

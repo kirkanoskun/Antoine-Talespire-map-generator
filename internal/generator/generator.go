@@ -50,6 +50,7 @@ type Generator struct {
 	enc             encoder.Encoder
 	transitionHalf  int
 	smoothingPasses int
+	sliceSize       int
 }
 
 // New loads the biome and prop catalogues from the given config paths.
@@ -80,12 +81,31 @@ func (g *Generator) SetTransitionHalfWidth(tiles int) {
 	g.transitionHalf = tiles
 }
 
+// SetSliceSize sets the tile size of each exported slab slice. Zero (default)
+// emits the whole map as a single slab. A positive value slices the map into a
+// grid of slabs of at most that many tiles per side, each with its own local
+// origin so they paste adjacent in TaleSpire. Slicing is the Phase 5 answer to
+// TaleSpire's ~30 kB per-slab limit (a large single slab fails on save / board
+// switch).
+func (g *Generator) SetSliceSize(tiles int) {
+	if tiles < 0 {
+		tiles = 0
+	}
+	g.sliceSize = tiles
+}
+
+// TaleSpireSlabLimitBytes is TaleSpire's documented per-slab size limit: a slab
+// larger than this pastes but fails when saved or when switching boards.
+// (https://talespire.com/faq)
+const TaleSpireSlabLimitBytes = 30000
+
 // Result is the output of a generation run.
 type Result struct {
-	Code       string       // base64 TaleSpire slab, paste into the game
+	Code       string       // base64 TaleSpire slab for the whole map (paste into the game)
+	Slices     [][]string   // grid of per-slice codes when slicing is enabled ([x][y]); nil otherwise
 	AssetCount int          // total assets placed
 	Height     *HeightField // per-tile height/relief, for preview and inspection
-	Warnings   []string     // non-fatal issues (e.g. unknown POI prop ids)
+	Warnings   []string     // non-fatal issues (unknown POI props, oversized slabs)
 }
 
 // HeightField exposes the shaped terrain so the preview renderer can shade it.
@@ -148,22 +168,97 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		g.carvePaths(doc, field, paths)
 	}
 
-	slab := &taleslabentities.Slab{}
 	res := &Result{Height: field}
+	var placements []placement
+	placements = g.placeGround(placements, biome, field, rng)
+	placements = g.placeProps(placements, biome, doc, field, trans, paths, rng)
+	placements = g.placePOIs(placements, doc, mask, field, rng, res)
+	res.AssetCount = len(placements)
 
-	g.placeGround(slab, biome, field, rng)
-	g.placeProps(slab, biome, doc, field, trans, paths, rng)
-	g.placePOIs(slab, doc, mask, field, rng, res)
-
-	res.AssetCount = len(slab.Assets)
-
-	taleSpireSlab := taleSpireSlabFromSlab(slab)
-	code, err := g.enc.Encode(taleSpireSlab)
+	// Whole-map slab (always produced, for a single copy-paste).
+	code, err := g.encodeRegion(placements, 0, 0)
 	if err != nil {
-		return nil, fmt.Errorf("encoding slab: %w", err)
+		return nil, err
 	}
 	res.Code = code
+	if len(code) > TaleSpireSlabLimitBytes && g.sliceSize == 0 {
+		res.Warnings = append(res.Warnings, fmt.Sprintf(
+			"slab is %d bytes, over TaleSpire's ~%d byte limit; enable slicing (-slice) to export it in pieces",
+			len(code), TaleSpireSlabLimitBytes))
+	}
+
+	// Optional sliced grid for large maps.
+	if g.sliceSize > 0 {
+		slices, err := g.encodeSlices(placements, field.Width, field.Length, res)
+		if err != nil {
+			return nil, err
+		}
+		res.Slices = slices
+	}
 	return res, nil
+}
+
+// placement is a deferred asset: a part at a tile with a z and base rotation.
+// Coordinates are finalized per slice so each slab can use a local origin.
+type placement struct {
+	part         *taleslabentities.Part
+	tileX, tileY int
+	z            int
+	baseRotation int
+}
+
+// encodeRegion builds and encodes a single slab from the placements whose tile
+// falls in the region [originX, originX+size) — or all placements when size is
+// non-positive — with coordinates rebased to (originX, originY).
+func (g *Generator) encodeRegion(placements []placement, originX, originY int) (string, error) {
+	slab := &taleslabentities.Slab{}
+	for i := range placements {
+		p := &placements[i]
+		slab.Assets = append(slab.Assets, buildAsset(p, originX, originY))
+	}
+	code, err := g.enc.Encode(taleSpireSlabFromSlab(slab))
+	if err != nil {
+		return "", fmt.Errorf("encoding slab: %w", err)
+	}
+	return code, nil
+}
+
+// encodeSlices partitions the map into a grid of slabs of at most sliceSize
+// tiles per side, each with a local origin, and encodes each. Oversized slices
+// are reported as warnings.
+func (g *Generator) encodeSlices(placements []placement, w, l int, res *Result) ([][]string, error) {
+	size := g.sliceSize
+	nx := (w + size - 1) / size
+	ny := (l + size - 1) / size
+
+	// Bucket placements by slice for a single pass.
+	buckets := make([][][]placement, nx)
+	for sx := 0; sx < nx; sx++ {
+		buckets[sx] = make([][]placement, ny)
+	}
+	for _, p := range placements {
+		sx := p.tileX / size
+		sy := p.tileY / size
+		buckets[sx][sy] = append(buckets[sx][sy], p)
+	}
+
+	slices := make([][]string, nx)
+	for sx := 0; sx < nx; sx++ {
+		slices[sx] = make([]string, ny)
+		for sy := 0; sy < ny; sy++ {
+			code, err := g.encodeRegion(buckets[sx][sy], sx*size, sy*size)
+			if err != nil {
+				return nil, err
+			}
+			slices[sx][sy] = code
+			if len(code) > TaleSpireSlabLimitBytes {
+				res.Warnings = append(res.Warnings, fmt.Sprintf(
+					"slice [%d,%d] is %d bytes, over TaleSpire's ~%d byte limit; use a smaller -slice",
+					sx, sy, len(code), TaleSpireSlabLimitBytes))
+			}
+		}
+	}
+	return slices, nil
 }
 
 // shapeTerrain computes per-tile height and the resolved relief key from each
@@ -229,7 +324,7 @@ func shapeTerrain(doc *ir.IR, mask *spatial.Mask) *HeightField {
 // placeGround stacks building blocks for every tile, filling vertical gaps down
 // to the lowest 4-neighbour so cliffs between heights are solid (mirrors
 // taleslab's wall-filling), using the map biome and each tile's resolved relief.
-func (g *Generator) placeGround(slab *taleslabentities.Slab, biome *taleslabentities.Biome, f *HeightField, rng *rand.Rand) {
+func (g *Generator) placeGround(out []placement, biome *taleslabentities.Biome, f *HeightField, rng *rand.Rand) []placement {
 	for x := 0; x < f.Width; x++ {
 		for y := 0; y < f.Length; y++ {
 			t := f.tiles[x][y]
@@ -247,13 +342,12 @@ func (g *Generator) placeGround(slab *taleslabentities.Slab, biome *taleslabenti
 
 			for _, part := range block.Parts {
 				for k := minH; k <= t.height; k++ {
-					asset := newAsset(part)
-					setCoordinates(asset, x, y, k+part.OffsetZ, groundRotation)
-					slab.Assets = append(slab.Assets, asset)
+					out = append(out, placement{part: part, tileX: x, tileY: y, z: k + part.OffsetZ, baseRotation: groundRotation})
 				}
 			}
 		}
 	}
+	return out
 }
 
 // placeProps scatters vegetation / stones / misc using the map biome's per-relief
@@ -261,7 +355,7 @@ func (g *Generator) placeGround(slab *taleslabentities.Slab, biome *taleslabenti
 // spacing. When trans is non-nil, the effective density near a zone border is
 // blended toward the neighbouring zone's density so the change is gradual rather
 // than a hard line.
-func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, trans *spatial.Transitions, paths *spatial.Paths, rng *rand.Rand) {
+func (g *Generator) placeProps(out []placement, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, trans *spatial.Transitions, paths *spatial.Paths, rng *rand.Rand) []placement {
 	occupied := make([][]bool, f.Width)
 	for x := range occupied {
 		occupied[x] = make([]bool, f.Length)
@@ -313,20 +407,20 @@ func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentit
 				if prop == nil {
 					continue
 				}
+				rot := randomRotation(rng)
 				for _, part := range prop.Parts {
-					asset := newAsset(part)
-					setCoordinates(asset, x, y, t.height+part.OffsetZ, randomRotation(rng))
-					slab.Assets = append(slab.Assets, asset)
+					out = append(out, placement{part: part, tileX: x, tileY: y, z: t.height + part.OffsetZ, baseRotation: rot})
 				}
 				occupied[x][y] = true
 				break // one prop per tile
 			}
 		}
 	}
+	return out
 }
 
 // placePOIs positions explicit points of interest deterministically.
-func (g *Generator) placePOIs(slab *taleslabentities.Slab, doc *ir.IR, mask *spatial.Mask, f *HeightField, rng *rand.Rand, res *Result) {
+func (g *Generator) placePOIs(out []placement, doc *ir.IR, mask *spatial.Mask, f *HeightField, rng *rand.Rand, res *Result) []placement {
 	for zi := range doc.Zones {
 		zone := &doc.Zones[zi]
 		for _, poi := range zone.PointsOfInterest {
@@ -347,14 +441,14 @@ func (g *Generator) placePOIs(slab *taleslabentities.Slab, doc *ir.IR, mask *spa
 
 			for _, p := range positions {
 				x, y := p[0], p[1]
+				rot := randomRotation(rng)
 				for _, part := range prop.Parts {
-					asset := newAsset(part)
-					setCoordinates(asset, x, y, f.tiles[x][y].height+part.OffsetZ, randomRotation(rng))
-					slab.Assets = append(slab.Assets, asset)
+					out = append(out, placement{part: part, tileX: x, tileY: y, z: f.tiles[x][y].height + part.OffsetZ, baseRotation: rot})
 				}
 			}
 		}
 	}
+	return out
 }
 
 // pathRelief is the relief carved paths use: a bare, walkable ground present in
@@ -496,25 +590,25 @@ func distributionFor(pb *taleslabentities.PropBlocks, e elementtype.ElementType)
 	}
 }
 
-func newAsset(part *taleslabentities.Part) *taleslabentities.Asset {
+// buildAsset finalizes a placement into a TaleSpire asset, rebasing its tile to
+// the given slice origin. Grid indices are multiplied by the asset's footprint
+// (taleslab's convention); the rotation is nudged by the global row so tiling
+// props don't look uniform (using the global tileY keeps a single-slab map's
+// output identical whether or not slicing is enabled).
+func buildAsset(p *placement, originX, originY int) *taleslabentities.Asset {
+	part := p.part
 	return &taleslabentities.Asset{
 		ID:         part.ID,
 		Name:       part.Name,
 		Dimensions: part.Dimensions,
 		OffsetZ:    part.OffsetZ,
+		Coordinates: &taleslabentities.Vector3d{
+			X: (p.tileX - originX) * part.Dimensions.Width,
+			Y: (p.tileY - originY) * part.Dimensions.Length,
+			Z: p.z * part.Dimensions.Height,
+		},
+		Rotation: p.baseRotation + (p.tileY * part.Dimensions.Length / 41),
 	}
-}
-
-// setCoordinates matches taleslab's convention: grid indices are multiplied by
-// the asset's footprint, and rotation is nudged by row so tiling props don't
-// look uniform.
-func setCoordinates(asset *taleslabentities.Asset, x, y, z, rotation int) {
-	asset.Coordinates = &taleslabentities.Vector3d{
-		X: x * asset.Dimensions.Width,
-		Y: y * asset.Dimensions.Length,
-		Z: z * asset.Dimensions.Height,
-	}
-	asset.Rotation = rotation + (y * asset.Dimensions.Length / 41)
 }
 
 func randomRotation(rng *rand.Rand) int {

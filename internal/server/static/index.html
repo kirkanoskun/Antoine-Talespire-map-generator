@@ -81,6 +81,7 @@
     <div class="panel">
       <h2>Code TaleSpire <button id="copy" class="secondary" style="float:right; padding:4px 10px;">Copier</button></h2>
       <pre id="code" class="muted">—</pre>
+      <div id="slices"></div>
     </div>
     <div class="panel">
       <h2>IR (éditable)</h2>
@@ -124,6 +125,25 @@ function render(data) {
   $("code").textContent = data.code;
   $("code").classList.remove("muted");
   $("ir").value = JSON.stringify(data.ir, null, 2);
+
+  const slicesBox = $("slices");
+  slicesBox.innerHTML = "";
+  if (data.slices && data.slices.length) {
+    const n = data.slices.length, m = data.slices[0].length;
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = `Découpé en ${n}×${m} slabs (limite TaleSpire ~30 ko). Colle chaque slab côte à côte :`;
+    slicesBox.appendChild(p);
+    for (let x = 0; x < n; x++) for (let y = 0; y < m; y++) {
+      const b = document.createElement("button");
+      b.className = "secondary";
+      b.style.margin = "2px";
+      b.textContent = `copier [${x},${y}]`;
+      b.onclick = () => navigator.clipboard.writeText(data.slices[x][y]).then(() => log(`Slice [${x},${y}] copiée.`));
+      slicesBox.appendChild(b);
+    }
+  }
+
   if (data.warnings && data.warnings.length) data.warnings.forEach(w => log("⚠ " + w, "err"));
 }
 
