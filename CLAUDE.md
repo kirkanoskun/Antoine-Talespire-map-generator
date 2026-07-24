@@ -76,8 +76,9 @@ What taleslab does **not** do, and is the real subject of this project:
    taleslab's catalogues. Explicit POIs are placed deterministically on top.
 5. **Zone stitching / transitions**: smooth prop **density and height** across a
    few tiles at zone borders. Because every zone shares one biome, this is a
-   simple intra-biome smoothing — *not* a fusion of two generation systems. Not
-   yet implemented (Phase 3).
+   simple intra-biome smoothing — *not* a fusion of two generation systems.
+   Implemented in Phase 3 (`spatial.Transitions` + `generator.smoothHeights` and
+   density blending).
 6. **2D preview**: top-down image (colour per biome, height shading, POI markers)
    generated before any TaleSpire export. Enables the fast iteration loop.
 7. **TaleSpire export**: encode the slab to the base64 blob via `talescoder`.
@@ -102,9 +103,14 @@ What taleslab does **not** do, and is the real subject of this project:
   strict schema + biome/relief validation and retry (invalid output is fed back
   to the model). `cmd/describe` runs description → IR → map end to end. Evaluated
   on ~10 varied descriptions via a live test gated on `ANTHROPIC_API_KEY`.
-- **Phase 3 — spatial resolution + stitching.** Zone placement algorithm and the
-  border transition logic (the riskiest part). Prototype early with the simple
-  case: two zones, one straight border.
+- **Phase 3 — spatial resolution + stitching (stitching DONE).** Weighted-Voronoi
+  placement (Phase 1) plus border transition logic — the riskiest part — now
+  smooths **height and prop density** across a band of tiles at zone borders
+  (`spatial.Transitions`, `generator.smoothHeights`, density blending). Validated
+  on the two-zone/straight-border case (`testdata/transition.json`): the seam
+  cliff drops from 5 to 3 blocks at half-width 3. **Remaining:** carving
+  `connections` (paths between zones) and nested/contained zones (Voronoi can't
+  nest) — deferred.
 - **Phase 4 — UI + iteration loop.** 2D render, web UI, in-memory IR for
   conversational adjustments.
 - **Phase 5 — export + polish.** `talescoder` integration end-to-end, real
@@ -116,12 +122,12 @@ What taleslab does **not** do, and is the real subject of this project:
 cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
 cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
 internal/ir/          IR types, strict JSON parsing & validation
-internal/spatial/     weighted-Voronoi zone mask resolver
-internal/generator/   zone-aware slab generation + deterministic encoder mapper
+internal/spatial/     weighted-Voronoi zone mask + border transition bands
+internal/generator/   zone-aware slab generation, stitching, deterministic mapper
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry
 configs/              biomes.json, props.json (copied from taleslab)
-testdata/             castle.json, twozones.json, descriptions.txt (NL eval)
+testdata/             castle.json, twozones.json, transition.json, descriptions.txt
 ```
 
 Run it:
@@ -180,11 +186,29 @@ ANTHROPIC_API_KEY=... go test ./internal/nl/    # runs the ~10-description eval
   50 tiles; large maps may need slicing for the TaleSpire editor (revisit with
   TaleSpire's documented limits — brief section 8).
 
+### Phase 3 stitching notes
+
+- **Transition band via bounded BFS.** `Mask.Transitions(halfWidth)` seeds every
+  seam tile (a tile adjacent to a different zone) at distance 1 and grows inward,
+  staying within each tile's own zone, up to the half-width. Each in-band tile
+  records the foreign zone across its nearest seam and a blend factor (0.5 at the
+  seam, fading to 0 at the band edge) — so a seam tile blending 0.5 toward its
+  neighbour meets the neighbour blending 0.5 back, converging to the average.
+- **Height** is smoothed by averaging in-band tiles over a few passes (fresh
+  buffer per pass for order-independence). Water tiles keep their height (a pond
+  stays a pond) but still pull neighbours down, so a hill slopes to the water's
+  edge. **Density** is blended: near a border the effective category weight lerps
+  toward the neighbouring zone's weight. The **material relief stays sharp** — a
+  tile is either ground or mountain; only height and density are smoothed, which
+  is exactly the intra-biome model (no material fusion).
+- **Off by default? No — on by default** (half-width 3), disable with
+  `SetTransitionHalfWidth(0)` or `-transition 0`. Single-zone maps have no seams,
+  so stitching is a no-op there (Phase 1/2 outputs are unchanged).
+
 ### Open risks (from the brief)
 
-- Zone stitching (step 5) — now a simpler intra-biome density/height smoothing
-  (no biome fusion). Still worth prototyping on the two-zone/straight-border
-  case first.
+- Zone stitching (step 5) — DONE as intra-biome density/height smoothing. Next
+  spatial work: connection carving and nested zones.
 - IR reliability: validate the model's IR strictly server-side, retry on invalid.
 - Claude API call count/cost per session (one initial + one per adjustment).
 - TaleSpire's real max map size — verify before defaulting to large maps.

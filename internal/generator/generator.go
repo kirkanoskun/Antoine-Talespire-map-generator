@@ -39,11 +39,17 @@ const (
 	groundRotation    = 768
 )
 
+// defaultTransitionHalfWidth is the band half-width (in tiles) over which zone
+// borders are smoothed. Two zones therefore blend across ~2*this tiles.
+const defaultTransitionHalfWidth = 3
+
 // Generator holds the shared, stateless taleslab resources.
 type Generator struct {
-	biomes domainrepos.BiomeRepository
-	props  domainrepos.PropRepository
-	enc    encoder.Encoder
+	biomes          domainrepos.BiomeRepository
+	props           domainrepos.PropRepository
+	enc             encoder.Encoder
+	transitionHalf  int
+	smoothingPasses int
 }
 
 // New loads the biome and prop catalogues from the given config paths.
@@ -56,7 +62,22 @@ func New(biomesPath, propsPath string) (*Generator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading props: %w", err)
 	}
-	return &Generator{biomes: biomes, props: props, enc: encoder.NewEncoder()}, nil
+	return &Generator{
+		biomes:          biomes,
+		props:           props,
+		enc:             encoder.NewEncoder(),
+		transitionHalf:  defaultTransitionHalfWidth,
+		smoothingPasses: 2,
+	}, nil
+}
+
+// SetTransitionHalfWidth sets the zone-border stitching band half-width in
+// tiles. Zero disables stitching (hard borders). This is the Phase 3 knob.
+func (g *Generator) SetTransitionHalfWidth(tiles int) {
+	if tiles < 0 {
+		tiles = 0
+	}
+	g.transitionHalf = tiles
 }
 
 // Result is the output of a generation run.
@@ -111,11 +132,20 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 	rng := rand.New(rand.NewSource(seed))
 
 	field := shapeTerrain(doc, mask)
+
+	// Phase 3 stitching: smooth height and prop density across zone borders.
+	// Only meaningful with more than one zone.
+	var trans *spatial.Transitions
+	if g.transitionHalf > 0 && len(doc.Zones) > 1 {
+		trans = mask.Transitions(g.transitionHalf)
+		smoothHeights(field, trans, g.smoothingPasses)
+	}
+
 	slab := &taleslabentities.Slab{}
 	res := &Result{Height: field}
 
 	g.placeGround(slab, biome, field, rng)
-	g.placeProps(slab, biome, doc, field, rng)
+	g.placeProps(slab, biome, doc, field, trans, rng)
 	g.placePOIs(slab, doc, mask, field, rng, res)
 
 	res.AssetCount = len(slab.Assets)
@@ -221,8 +251,10 @@ func (g *Generator) placeGround(slab *taleslabentities.Slab, biome *taleslabenti
 
 // placeProps scatters vegetation / stones / misc using the map biome's per-relief
 // weights, modulated by each zone's density_overrides, with taleslab-style
-// spacing.
-func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, rng *rand.Rand) {
+// spacing. When trans is non-nil, the effective density near a zone border is
+// blended toward the neighbouring zone's density so the change is gradual rather
+// than a hard line.
+func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, trans *spatial.Transitions, rng *rand.Rand) {
 	occupied := make([][]bool, f.Width)
 	for x := range occupied {
 		occupied[x] = make([]bool, f.Length)
@@ -254,9 +286,13 @@ func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentit
 				if len(dist.Props) == 0 {
 					continue
 				}
-				weight := dist.Weight
-				if ov, ok := zone.DensityOverrides[cat.override]; ok {
-					weight = ov
+				weight := categoryWeight(zone, cat.override, dist.Weight)
+				// Blend toward the neighbouring zone's density near a border.
+				if trans != nil {
+					if other, blend := trans.At(x, y); other >= 0 && blend > 0 {
+						ow := categoryWeight(&doc.Zones[other], cat.override, dist.Weight)
+						weight += (ow - weight) * blend
+					}
 				}
 				if rng.Float64() >= weight {
 					continue
@@ -326,6 +362,47 @@ func (g *Generator) buildingBlock(b *taleslabentities.Biome, reliefKey string, r
 }
 
 // --- helpers ---
+
+// categoryWeight returns a zone's effective placement weight for a prop category:
+// the zone's density_override if present, else the biome's default weight for the
+// tile's relief.
+func categoryWeight(zone *ir.Zone, override string, defaultWeight float64) float64 {
+	if ov, ok := zone.DensityOverrides[override]; ok {
+		return ov
+	}
+	return defaultWeight
+}
+
+// smoothHeights averages heights within the transition band so cliffs between
+// zones of different elevation become gradual slopes. It runs a few passes,
+// writing each pass into a fresh buffer for order-independence. Water tiles keep
+// their height (a pond stays a pond) but still pull their neighbours down, so a
+// hill slopes toward the water's edge.
+func smoothHeights(f *HeightField, trans *spatial.Transitions, passes int) {
+	for p := 0; p < passes; p++ {
+		type update struct {
+			x, y, h int
+		}
+		var updates []update
+		for x := 0; x < f.Width; x++ {
+			for y := 0; y < f.Length; y++ {
+				if !trans.InBand(x, y) || f.tiles[x][y].relief == string(elementtype.Water) {
+					continue
+				}
+				sum := f.tiles[x][y].height
+				cnt := 1
+				for _, h := range neighbours(f, x, y) {
+					sum += h
+					cnt++
+				}
+				updates = append(updates, update{x, y, (sum + cnt/2) / cnt})
+			}
+		}
+		for _, u := range updates {
+			f.tiles[u.x][u.y].height = u.h
+		}
+	}
+}
 
 func neighbours(f *HeightField, x, y int) []int {
 	var out []int

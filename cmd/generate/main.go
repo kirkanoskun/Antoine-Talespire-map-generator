@@ -31,6 +31,7 @@ func main() {
 	props := flag.String("props", "configs/props.json", "path to props.json")
 	scale := flag.Int("scale", 8, "preview pixels per tile")
 	seed := flag.Int64("seed", 1, "random seed for reproducible generation")
+	transition := flag.Int("transition", 3, "zone-border stitching half-width in tiles (0 = hard borders)")
 	flag.Parse()
 
 	if *input == "" {
@@ -53,6 +54,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialising generator: %v", err)
 	}
+	gen.SetTransitionHalfWidth(*transition)
 	res, err := gen.Generate(doc, mask, *seed)
 	if err != nil {
 		log.Fatalf("generating: %v", err)

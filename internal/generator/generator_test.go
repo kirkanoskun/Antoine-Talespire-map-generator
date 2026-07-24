@@ -163,6 +163,73 @@ func TestUnknownReliefOverrideFails(t *testing.T) {
 	}
 }
 
+// maxSeamHeightDelta returns the largest height jump across any border between
+// two different zones — the "cliff" that stitching is meant to soften.
+func maxSeamHeightDelta(h *HeightField, mask *spatial.Mask) int {
+	max := 0
+	for x := 0; x < h.Width; x++ {
+		for y := 0; y < h.Length; y++ {
+			z := mask.ZoneIndexAt(x, y)
+			for _, n := range [][2]int{{x + 1, y}, {x, y + 1}} {
+				nx, ny := n[0], n[1]
+				if nx >= h.Width || ny >= h.Length {
+					continue
+				}
+				if mask.ZoneIndexAt(nx, ny) == z {
+					continue
+				}
+				d := h.HeightAt(x, y) - h.HeightAt(nx, ny)
+				if d < 0 {
+					d = -d
+				}
+				if d > max {
+					max = d
+				}
+			}
+		}
+	}
+	return max
+}
+
+// TestStitchingSoftensBorderCliff verifies the Phase 3 headline: a flat zone
+// next to a mountainous one has a gentler height step across the border with
+// stitching on than with it off.
+func TestStitchingSoftensBorderCliff(t *testing.T) {
+	const doc = `{
+		"map":{"width":40,"length":40,"name":"t","biome":"temperate_forest"},
+		"zones":[
+			{"id":"plain","anchor":{"x":10,"y":20},"relative_size":0.5,"elevation":"flat"},
+			{"id":"peaks","anchor":{"x":30,"y":20},"relative_size":0.5,"elevation":"mountain"}
+		]}`
+	parsed, err := ir.Parse([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := newTestGen(t)
+
+	g.SetTransitionHalfWidth(0) // hard borders
+	hard, err := g.Generate(parsed, spatial.Resolve(parsed), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hardDelta := maxSeamHeightDelta(hard.Height, spatial.Resolve(parsed))
+
+	g.SetTransitionHalfWidth(3) // stitched
+	soft, err := g.Generate(parsed, spatial.Resolve(parsed), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	softDelta := maxSeamHeightDelta(soft.Height, spatial.Resolve(parsed))
+
+	if hardDelta == 0 {
+		t.Skip("no cliff to soften with these anchors")
+	}
+	t.Logf("seam height cliff: hard=%d soft=%d", hardDelta, softDelta)
+	if softDelta >= hardDelta {
+		t.Errorf("stitching did not soften the border: hard=%d soft=%d", hardDelta, softDelta)
+	}
+}
+
 // TestReliefOverrideBeatsElevationRelief confirms the precedence rule: a deep
 // depression that would normally become water stays non-water when the zone
 // overrides the relief to something else.

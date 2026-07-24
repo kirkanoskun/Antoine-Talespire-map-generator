@@ -25,11 +25,14 @@ a preview:
 
 ```
 description  ->  Claude (validate + retry)  ->  IR (JSON)
-IR (JSON)    ->  weighted-Voronoi zone mask ->  per-tile zone-aware slab  ->  base64 code
+IR (JSON)    ->  weighted-Voronoi zone mask ->  border stitching  ->  slab  ->  base64 code
                                             \->  2D top-down PNG preview
 ```
 
-Border transitions (Phase 3) and the web UI (Phase 4) are not implemented yet.
+Adjacent zones are **stitched**: height and prop density are smoothed across a
+band of tiles at each border (the material relief stays crisp — a tile is either
+ground or mountain). The web UI and conversational iteration (Phase 4) are not
+implemented yet.
 
 ## Quick start
 
@@ -80,6 +83,7 @@ coherence) and, on any failure, feeds the exact error back and retries.
 | `-props`   | `configs/props.json` | prop catalogue                           |
 | `-scale`   | `8`                  | preview pixels per tile                  |
 | `-seed`    | `1`                  | seed for reproducible generation         |
+| `-transition` | `3`               | border stitching half-width (0 = hard)   |
 
 ## The IR format
 
@@ -131,8 +135,8 @@ with a pond and northern ruins).
 cmd/generate/         CLI: IR -> map
 cmd/describe/         CLI: description -> IR -> map
 internal/ir/          IR types, strict parsing & validation
-internal/spatial/     weighted-Voronoi zone mask
-internal/generator/   zone-aware slab generation + deterministic encoding
+internal/spatial/     weighted-Voronoi zone mask + border transition bands
+internal/generator/   zone-aware slab generation, stitching, deterministic encoding
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          natural language -> IR (Claude call, validate + retry)
 configs/              biome & prop catalogues (from taleslab)
