@@ -131,6 +131,53 @@ func TestWaterInDepression(t *testing.T) {
 	}
 }
 
+// TestConnectionCarvesRampedPath verifies Phase 3 connection carving: path
+// tiles become bare ground and their heights ramp between the two zones.
+func TestConnectionCarvesRampedPath(t *testing.T) {
+	const doc = `{
+		"map":{"width":40,"length":40,"name":"t","biome":"temperate_forest"},
+		"zones":[
+			{"id":"low","anchor":{"x":8,"y":20},"relative_size":0.5,"elevation":"flat"},
+			{"id":"high","anchor":{"x":32,"y":20},"relative_size":0.5,"elevation":"mountain"}
+		],
+		"connections":[{"from":"low","to":"high","type":"path","width":3}]}`
+	parsed, err := ir.Parse([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := newTestGen(t).Generate(parsed, spatial.Resolve(parsed), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := spatial.BuildPaths(parsed)
+	pathTiles := 0
+	westH, eastH := -1, -1
+	for x := 0; x < res.Height.Width; x++ {
+		for y := 0; y < res.Height.Length; y++ {
+			if !paths.On(x, y) {
+				continue
+			}
+			pathTiles++
+			if res.Height.ReliefAt(x, y) != "base_ground" {
+				t.Fatalf("path tile (%d,%d) not carved to base_ground: %q", x, y, res.Height.ReliefAt(x, y))
+			}
+			if y == 20 && x <= 9 {
+				westH = res.Height.HeightAt(x, y)
+			}
+			if y == 20 && x >= 31 {
+				eastH = res.Height.HeightAt(x, y)
+			}
+		}
+	}
+	if pathTiles == 0 {
+		t.Fatal("no path tiles carved")
+	}
+	if westH >= 0 && eastH >= 0 && eastH <= westH {
+		t.Errorf("path did not ramp upward toward the mountain: west=%d east=%d", westH, eastH)
+	}
+}
+
 func TestReliefOverrideResolves(t *testing.T) {
 	doc, err := ir.Parse([]byte(`{
 		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},

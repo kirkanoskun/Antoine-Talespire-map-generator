@@ -29,9 +29,11 @@ IR (JSON)    ->  weighted-Voronoi zone mask ->  border stitching  ->  slab  ->  
                                             \->  2D top-down PNG preview
 ```
 
-Adjacent zones are **stitched**: height and prop density are smoothed across a
-band of tiles at each border (the material relief stays crisp — a tile is either
-ground or mountain). The web UI and conversational iteration (Phase 4) are not
+The spatial layer is complete: adjacent zones are **stitched** (height and prop
+density smoothed across a band at each border; the material relief stays crisp),
+a small zone sharing a larger zone's anchor is **nested** as a disc (a pond at
+the courtyard centre), and **connections** are carved into bare corridors that
+ramp between zones. The web UI and conversational iteration (Phase 4) are not
 implemented yet.
 
 ## Quick start
@@ -126,6 +128,10 @@ Per zone (a zone modulates the biome, it never replaces it):
 - **points_of_interest**: explicit props placed deterministically, either at an
   `{x,y}` or `"scattered"` with a `count`.
 
+Give a small zone the **same anchor** as a larger one to nest it (a pond at the
+centre of a courtyard). Add a `connections` entry `{from, to, type, width}` to
+carve a walkable, ramped path between two zones.
+
 See `testdata/castle.json` for the full brief example (a ruined castle courtyard
 with a pond and northern ruins).
 
@@ -135,8 +141,8 @@ with a pond and northern ruins).
 cmd/generate/         CLI: IR -> map
 cmd/describe/         CLI: description -> IR -> map
 internal/ir/          IR types, strict parsing & validation
-internal/spatial/     weighted-Voronoi zone mask + border transition bands
-internal/generator/   zone-aware slab generation, stitching, deterministic encoding
+internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
+internal/generator/   zone-aware slab generation, stitching, paths, encoding
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          natural language -> IR (Claude call, validate + retry)
 configs/              biome & prop catalogues (from taleslab)

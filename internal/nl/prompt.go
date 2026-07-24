@@ -49,6 +49,8 @@ Notes:
 - elevation sets HEIGHT; relief_override sets the MATERIAL and wins over the height-derived relief. A deep "depression" becomes water only when there is no relief_override.
 - density_overrides values are absolute weights (probability a tile gets that prop category), not multipliers. Typical values: sparse 0.02-0.1, normal 0.15-0.25, dense 0.3-0.5.
 - Use points_of_interest for explicit, deliberately placed elements ("an altar at the centre", "four broken pillars around the pond").
+- Nested zones are supported: to put a small feature at the CENTRE of a larger zone (a pond in the middle of a courtyard), give the small zone the SAME anchor as the larger one. It is carved out as a disc inside its container.
+- connections are carved into walkable paths that clear props and ramp in height between the two zones' anchors — use one for "a path that climbs to the ruins".
 
 `)
 

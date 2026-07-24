@@ -141,11 +141,18 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		smoothHeights(field, trans, g.smoothingPasses)
 	}
 
+	// Carve connections into bare, leveled corridors that ramp between zones.
+	var paths *spatial.Paths
+	if len(doc.Connections) > 0 {
+		paths = spatial.BuildPaths(doc)
+		g.carvePaths(doc, field, paths)
+	}
+
 	slab := &taleslabentities.Slab{}
 	res := &Result{Height: field}
 
 	g.placeGround(slab, biome, field, rng)
-	g.placeProps(slab, biome, doc, field, trans, rng)
+	g.placeProps(slab, biome, doc, field, trans, paths, rng)
 	g.placePOIs(slab, doc, mask, field, rng, res)
 
 	res.AssetCount = len(slab.Assets)
@@ -254,7 +261,7 @@ func (g *Generator) placeGround(slab *taleslabentities.Slab, biome *taleslabenti
 // spacing. When trans is non-nil, the effective density near a zone border is
 // blended toward the neighbouring zone's density so the change is gradual rather
 // than a hard line.
-func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, trans *spatial.Transitions, rng *rand.Rand) {
+func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentities.Biome, doc *ir.IR, f *HeightField, trans *spatial.Transitions, paths *spatial.Paths, rng *rand.Rand) {
 	occupied := make([][]bool, f.Width)
 	for x := range occupied {
 		occupied[x] = make([]bool, f.Length)
@@ -273,6 +280,9 @@ func (g *Generator) placeProps(slab *taleslabentities.Slab, biome *taleslabentit
 		for y := 1; y < f.Length-1; y++ {
 			if tooClose(occupied, x, y) {
 				continue
+			}
+			if paths != nil && paths.On(x, y) {
+				continue // keep carved paths clear of scatter
 			}
 			t := f.tiles[x][y]
 			zone := &doc.Zones[t.zone]
@@ -343,6 +353,50 @@ func (g *Generator) placePOIs(slab *taleslabentities.Slab, doc *ir.IR, mask *spa
 					slab.Assets = append(slab.Assets, asset)
 				}
 			}
+		}
+	}
+}
+
+// pathRelief is the relief carved paths use: a bare, walkable ground present in
+// every biome, so a corridor reads as a distinct trail through the scene.
+const pathRelief = "base_ground"
+
+// carvePaths turns the path overlay into leveled corridors. Each path tile's
+// height is set to a linear ramp between the two connected zones' anchor heights
+// (so the trail climbs from one to the other) and its relief to bare ground.
+// Endpoint heights are snapshotted before any tile is rewritten.
+func (g *Generator) carvePaths(doc *ir.IR, f *HeightField, paths *spatial.Paths) {
+	if !paths.Any() {
+		return
+	}
+	anchorHeight := make(map[string]int, len(doc.Zones))
+	for i := range doc.Zones {
+		z := &doc.Zones[i]
+		anchorHeight[z.ID] = f.tiles[z.Anchor.X][z.Anchor.Y].height
+	}
+	type endpoints struct {
+		h0, h1 int
+		ok     bool
+	}
+	eps := make([]endpoints, len(doc.Connections))
+	for ci := range doc.Connections {
+		c := &doc.Connections[ci]
+		h0, ok0 := anchorHeight[c.From]
+		h1, ok1 := anchorHeight[c.To]
+		eps[ci] = endpoints{h0: h0, h1: h1, ok: ok0 && ok1}
+	}
+
+	for x := 0; x < f.Width; x++ {
+		for y := 0; y < f.Length; y++ {
+			if !paths.On(x, y) {
+				continue
+			}
+			if ci := paths.Conn(x, y); ci >= 0 && eps[ci].ok {
+				t := paths.Param(x, y)
+				h := float64(eps[ci].h0) + (float64(eps[ci].h1)-float64(eps[ci].h0))*t
+				f.tiles[x][y].height = int(h + 0.5)
+			}
+			f.tiles[x][y].relief = pathRelief
 		}
 	}
 }

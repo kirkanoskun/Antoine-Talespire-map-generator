@@ -103,14 +103,15 @@ What taleslab does **not** do, and is the real subject of this project:
   strict schema + biome/relief validation and retry (invalid output is fed back
   to the model). `cmd/describe` runs description → IR → map end to end. Evaluated
   on ~10 varied descriptions via a live test gated on `ANTHROPIC_API_KEY`.
-- **Phase 3 — spatial resolution + stitching (stitching DONE).** Weighted-Voronoi
-  placement (Phase 1) plus border transition logic — the riskiest part — now
-  smooths **height and prop density** across a band of tiles at zone borders
-  (`spatial.Transitions`, `generator.smoothHeights`, density blending). Validated
-  on the two-zone/straight-border case (`testdata/transition.json`): the seam
-  cliff drops from 5 to 3 blocks at half-width 3. **Remaining:** carving
-  `connections` (paths between zones) and nested/contained zones (Voronoi can't
-  nest) — deferred.
+- **Phase 3 — spatial resolution + stitching (DONE).** Weighted-Voronoi placement
+  plus: (1) border **stitching** — smooths height and prop density across a band
+  at zone borders (`spatial.Transitions`, `generator.smoothHeights`); the seam
+  cliff on `testdata/transition.json` drops from 5 to 3 blocks at half-width 3.
+  (2) **Nested zones** — a zone swallowed by a larger one (the pond at the
+  courtyard centre) is re-stamped as a disc (`spatial.stampNestedZones`,
+  `testdata/nested.json`). (3) **Connection carving** — `connections` become
+  bare, leveled corridors that ramp in height between zones (`spatial.BuildPaths`,
+  `generator.carvePaths`).
 - **Phase 4 — UI + iteration loop.** 2D render, web UI, in-memory IR for
   conversational adjustments.
 - **Phase 5 — export + polish.** `talescoder` integration end-to-end, real
@@ -127,7 +128,7 @@ internal/generator/   zone-aware slab generation, stitching, deterministic mappe
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry
 configs/              biomes.json, props.json (copied from taleslab)
-testdata/             castle.json, twozones.json, transition.json, descriptions.txt
+testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
 
 Run it:
@@ -159,11 +160,11 @@ ANTHROPIC_API_KEY=... go test ./internal/nl/    # runs the ~10-description eval
   Go map iteration (random order → non-reproducible base64). We use our own
   `taleSpireSlabFromSlab` (first-seen order) so a given seed yields identical
   output — important for caching and the iteration loop.
-- **Voronoi cannot nest zones.** A small zone whose anchor coincides with a
-  larger zone's anchor is swallowed (the brief's "pond at the courtyard centre").
-  Nested/contained zones need a different resolution step — a Phase 3 concern.
-  `testdata/castle.json` offsets the pond so Phase 1 demonstrates *adjacent*
-  zones (its explicit goal).
+- **Nested zones via disc stamping (Phase 3).** Pure Voronoi swallows a small
+  zone centred on a larger one. After the Voronoi pass, `stampNestedZones` finds
+  any zone whose area is far below its normalized fair share (the swallow signal)
+  and re-stamps it as a disc sized from that share, largest first. So a pond can
+  sit at the exact centre of a courtyard (`testdata/nested.json`, `castle.json`).
 - **New reliefs, not borrowed biomes.** Needs unmet by the biome (ruins, paving,
   …) are added as reliefs to that biome in `configs/biomes.json`. `ruins` was
   added to `temperate_forest` (broken-stone floor blocks + wall/skull props).
@@ -205,10 +206,24 @@ ANTHROPIC_API_KEY=... go test ./internal/nl/    # runs the ~10-description eval
   `SetTransitionHalfWidth(0)` or `-transition 0`. Single-zone maps have no seams,
   so stitching is a no-op there (Phase 1/2 outputs are unchanged).
 
+### Phase 3 connection & nesting notes
+
+- **Connections carved as ramped corridors.** `spatial.BuildPaths` rasterizes
+  each connection as a thick segment (its `width`, default 3) between the two
+  zones' anchors, recording per tile the parameter t in [0,1] along the path.
+  `generator.carvePaths` then levels each path tile to a linear height ramp
+  between the two anchors' heights (endpoints snapshotted first) and sets its
+  relief to bare `base_ground`; `placeProps` skips path tiles so the corridor
+  stays clear. A path from a low courtyard to high ruins climbs.
+- **Order of operations.** shapeTerrain → transitions + height smoothing →
+  carve paths → place ground/props/POIs. Paths override the smoothed heights so
+  the corridor is crisp; props are skipped on it.
+
 ### Open risks (from the brief)
 
-- Zone stitching (step 5) — DONE as intra-biome density/height smoothing. Next
-  spatial work: connection carving and nested zones.
+- Spatial resolution (steps 3 & 5) — DONE: stitching, nested zones, connection
+  carving. Possible future work: Voronoi relaxation for rounder cells, and paths
+  that route around obstacles rather than straight lines.
 - IR reliability: validate the model's IR strictly server-side, retry on invalid.
 - Claude API call count/cost per session (one initial + one per adjustment).
 - TaleSpire's real max map size — verify before defaulting to large maps.

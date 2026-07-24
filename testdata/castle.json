@@ -3,19 +3,19 @@
   "zones": [
     {
       "id": "courtyard",
-      "anchor": { "x": 25, "y": 25 },
-      "relative_size": 0.35,
+      "anchor": { "x": 25, "y": 28 },
+      "relative_size": 0.4,
       "elevation": "flat",
       "density_overrides": { "vegetation": 0.05, "stones": 0.1 },
       "description": "Cour centrale pavee, herbe eparse"
     },
     {
       "id": "pond",
-      "anchor": { "x": 25, "y": 33, "direction_from": "courtyard: south" },
+      "anchor": { "x": 25, "y": 28, "direction_from": "courtyard: center" },
       "relative_size": 0.1,
       "elevation": "depression",
       "relief_override": "water",
-      "description": "Mare au sud de la cour"
+      "description": "Mare au centre de la cour (zone imbriquee)"
     },
     {
       "id": "ruins_north",
