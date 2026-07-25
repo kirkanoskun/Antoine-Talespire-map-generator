@@ -16,6 +16,25 @@ biome — they only modulate, within it, the prop density, the relief used (via
 cover yet (e.g. ruins) are added as a new relief to that biome in
 `configs/biomes.json`, never by borrowing a different biome.
 
+## ⚠️ Validation status: complete but not validated end-to-end
+
+All five phases are implemented and the **offline** test suite is green
+(`go test ./...`, `go vet`, `gofmt`). Two things have **not** been exercised yet
+and are the acceptance TODO before calling this "verified":
+
+- [ ] **Real Claude call.** The natural-language layer (`/api/describe`,
+  `/api/adjust`, `cmd/describe`) has never run against the live model — only a
+  fake completer. Run `ANTHROPIC_API_KEY=... go run ./cmd/server` (or
+  `go test ./internal/nl/` with a key for the ~10-description eval) and confirm
+  it produces valid IR.
+- [ ] **In-game import.** No generated code has been pasted into an actual
+  TaleSpire client. Export a map and verify it imports and looks right
+  (including a sliced large map pasting adjacent).
+
+Everything automatable — encoding, `talescoder` decode round-trip, the ~30 kB
+slab limit, determinism, the spatial algorithms, the HTTP API — is covered by
+tests. The two boxes above need a key and the game, so they're manual.
+
 ## Status: Phases 1–5 — natural language to map, web UI, export
 
 Describe a scene in French; the engine turns it into a level-design
