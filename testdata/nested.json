@@ -1,0 +1,21 @@
+{
+  "map": { "width": 40, "length": 40, "name": "Nested zone: pond inside a clearing", "biome": "temperate_forest" },
+  "zones": [
+    {
+      "id": "clearing",
+      "anchor": { "x": 20, "y": 20 },
+      "relative_size": 0.7,
+      "elevation": "flat",
+      "density_overrides": { "vegetation": 0.2 },
+      "description": "Clairière boisée"
+    },
+    {
+      "id": "pond",
+      "anchor": { "x": 20, "y": 20, "direction_from": "clearing: center" },
+      "relative_size": 0.12,
+      "elevation": "depression",
+      "relief_override": "water",
+      "description": "Étang au centre exact de la clairière"
+    }
+  ]
+}

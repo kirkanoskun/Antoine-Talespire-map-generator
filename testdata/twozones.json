@@ -1,0 +1,22 @@
+{
+  "map": { "width": 40, "length": 40, "name": "Two zones, one border", "biome": "temperate_forest" },
+  "zones": [
+    {
+      "id": "dense_forest",
+      "anchor": { "x": 10, "y": 20 },
+      "relative_size": 0.5,
+      "elevation": "flat",
+      "density_overrides": { "vegetation": 0.35 },
+      "description": "Foret dense a l'ouest"
+    },
+    {
+      "id": "rocky_clearing",
+      "anchor": { "x": 30, "y": 20 },
+      "relative_size": 0.5,
+      "elevation": "hill",
+      "relief_override": "mountain",
+      "density_overrides": { "vegetation": 0.02, "stones": 0.3 },
+      "description": "Clairiere rocheuse a l'est, meme biome"
+    }
+  ]
+}

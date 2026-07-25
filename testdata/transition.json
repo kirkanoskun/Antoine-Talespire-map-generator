@@ -1,0 +1,22 @@
+{
+  "map": { "width": 40, "length": 40, "name": "Stitching demo: plain meets peaks", "biome": "temperate_forest" },
+  "zones": [
+    {
+      "id": "dense_plain",
+      "anchor": { "x": 10, "y": 20 },
+      "relative_size": 0.5,
+      "elevation": "flat",
+      "density_overrides": { "vegetation": 0.4 },
+      "description": "Plaine boisée dense à l'ouest"
+    },
+    {
+      "id": "bare_peaks",
+      "anchor": { "x": 30, "y": 20 },
+      "relative_size": 0.5,
+      "elevation": "mountain",
+      "relief_override": "mountain",
+      "density_overrides": { "vegetation": 0.02, "stones": 0.25 },
+      "description": "Sommets rocheux nus à l'est"
+    }
+  ]
+}

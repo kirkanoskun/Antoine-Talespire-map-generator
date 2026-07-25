@@ -1,0 +1,36 @@
+{
+  "map": { "width": 50, "length": 50, "name": "Cour de chateau en ruines", "biome": "temperate_forest" },
+  "zones": [
+    {
+      "id": "courtyard",
+      "anchor": { "x": 25, "y": 28 },
+      "relative_size": 0.4,
+      "elevation": "flat",
+      "density_overrides": { "vegetation": 0.05, "stones": 0.1 },
+      "description": "Cour centrale pavee, herbe eparse"
+    },
+    {
+      "id": "pond",
+      "anchor": { "x": 25, "y": 28, "direction_from": "courtyard: center" },
+      "relative_size": 0.1,
+      "elevation": "depression",
+      "relief_override": "water",
+      "description": "Mare au centre de la cour (zone imbriquee)"
+    },
+    {
+      "id": "ruins_north",
+      "anchor": { "x": 25, "y": 7, "direction_from": "courtyard: north" },
+      "relative_size": 0.2,
+      "elevation": "hill",
+      "relief_override": "ruins",
+      "points_of_interest": [
+        { "prop": "broken_pillar", "position": "scattered", "count": 4 },
+        { "prop": "altar", "position": { "x": 25, "y": 4 } }
+      ],
+      "description": "Vestiges au nord, sur une butte"
+    }
+  ],
+  "connections": [
+    { "from": "courtyard", "to": "ruins_north", "type": "path", "width": 3 }
+  ]
+}
