@@ -60,8 +60,10 @@ pasting the code(s) into an actual TaleSpire client.
 ## Quick start
 
 ```bash
-# Phase 4 — web UI: describe, preview, adjust, export (needs ANTHROPIC_API_KEY
-# for the description/adjust features; the "apply edited IR" path works offline)
+# Phase 4 — web UI: describe, preview, adjust, export. The description/adjust
+# features need ANTHROPIC_API_KEY (the "apply edited IR" path works offline).
+# The key can be exported, or dropped in a .env file (auto-loaded — see
+# .env.example); an exported variable wins over .env.
 go run ./cmd/server        # http://localhost:8080
 
 # Phase 2 — from a French description (needs ANTHROPIC_API_KEY)

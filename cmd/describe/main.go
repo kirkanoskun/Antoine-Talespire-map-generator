@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/joho/godotenv"
+
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/preview"
@@ -27,6 +29,9 @@ import (
 )
 
 func main() {
+	// Load .env from the working directory if present; real env vars win.
+	_ = godotenv.Load()
+
 	description := flag.String("description", "", "scene description (natural language)")
 	descFile := flag.String("description-file", "", "read the description from this file instead")
 	width := flag.Int("width", 50, "map width in tiles")

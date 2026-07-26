@@ -6,6 +6,8 @@
 //
 // The natural-language endpoints need an Anthropic credential (ANTHROPIC_API_KEY);
 // without one the server still runs and the "apply edited IR" path works offline.
+// A `.env` file in the working directory is loaded automatically (existing
+// environment variables take precedence over it).
 package main
 
 import (
@@ -13,12 +15,18 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/joho/godotenv"
+
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/server"
 )
 
 func main() {
+	// Load .env from the working directory if present (ignored when absent);
+	// real environment variables win over it.
+	_ = godotenv.Load()
+
 	addr := flag.String("addr", ":8080", "listen address")
 	biomes := flag.String("biomes", "configs/biomes.json", "path to biomes.json")
 	props := flag.String("props", "configs/props.json", "path to props.json")
