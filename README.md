@@ -57,12 +57,40 @@ ramp between zones. For export, large maps are **sliced** into a grid of slabs,
 each under TaleSpire's ~30 kB limit (`-slice`); the only remaining step is
 pasting the code(s) into an actual TaleSpire client.
 
-## Quick start
+## Desktop app (no terminal)
+
+`cmd/server` is a self-contained desktop app: it embeds the UI and the asset
+catalogues, starts a local server, opens the web UI in your default browser, and
+runs until you click **Quit**. Build a double-clickable app:
 
 ```bash
-# Phase 4 — web UI: describe, preview, adjust, export (needs ANTHROPIC_API_KEY
-# for the description/adjust features; the "apply edited IR" path works offline)
-go run ./cmd/server        # http://localhost:8080
+# macOS — produces "dist/TaleSpire Map Generator.app" (run on a Mac)
+./scripts/build-mac.sh
+
+# Windows — produces "dist/TaleSpire Map Generator.exe" (no console window;
+# cross-compiles from any OS)
+./scripts/build-windows.sh
+```
+
+The app is **unsigned**, so on first launch: macOS → right-click the `.app` →
+*Open* (once); Windows → *More info* → *Run anyway*.
+
+For the natural-language features, put your Anthropic key where the app can find
+it (it inherits no shell environment when double-clicked):
+
+- macOS: `mkdir -p ~/.talespire && echo 'ANTHROPIC_API_KEY=sk-ant-...' > ~/.talespire/.env`
+- Windows: a `.env` next to the `.exe`, or `%USERPROFILE%\.talespire\.env`
+
+Without a key, the app still runs and the "apply edited IR" path works offline.
+
+## Quick start (from source)
+
+```bash
+# Web UI: describe, preview, adjust, export. The description/adjust features need
+# ANTHROPIC_API_KEY (the "apply edited IR" path works offline). The key can be
+# exported, or dropped in a .env file (auto-loaded — see .env.example); an
+# exported variable wins over .env.
+go run ./cmd/server        # opens http://127.0.0.1:8080 in your browser
 
 # Phase 2 — from a French description (needs ANTHROPIC_API_KEY)
 go run ./cmd/describe \

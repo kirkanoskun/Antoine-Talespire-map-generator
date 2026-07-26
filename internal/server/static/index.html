@@ -3,195 +3,365 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TaleSpire map generator</title>
+<title>Le Cartographe — Générateur de cartes TaleSpire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#1e2127; --panel:#282c34; --ink:#e6e6e6; --muted:#9aa4b2; --accent:#6ca06c; --border:#3a3f4b; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  header { padding:14px 20px; border-bottom:1px solid var(--border); }
-  header h1 { margin:0; font-size:17px; font-weight:600; }
-  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
-  main { display:grid; grid-template-columns: 380px 1fr; gap:16px; padding:16px; align-items:start; }
-  @media (max-width: 860px){ main { grid-template-columns:1fr; } }
-  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; }
-  .panel h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
-  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
-  textarea, input, select { width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--border); border-radius:6px; padding:8px; font:inherit; }
-  textarea { resize:vertical; }
-  .row { display:flex; gap:8px; }
-  .row > * { flex:1; }
-  button { background:var(--accent); color:#0e1a0e; border:0; border-radius:6px; padding:9px 12px; font-weight:600; cursor:pointer; }
-  button.secondary { background:transparent; color:var(--ink); border:1px solid var(--border); }
-  button:disabled { opacity:.5; cursor:default; }
-  .preview { display:flex; align-items:center; justify-content:center; min-height:320px; background:var(--bg); border:1px solid var(--border); border-radius:6px; }
-  .preview img { max-width:100%; image-rendering:pixelated; border-radius:4px; }
-  .muted { color:var(--muted); font-size:13px; }
-  #chat { max-height:220px; overflow:auto; margin-bottom:8px; }
-  .msg { padding:6px 9px; border-radius:6px; margin:4px 0; font-size:14px; }
-  .msg.user { background:#31363f; }
-  .msg.sys { background:transparent; color:var(--muted); font-size:13px; }
-  .msg.err { background:#4a2b2b; color:#ffbdbd; }
-  code, pre { font-family: ui-monospace, monospace; }
-  pre#code { white-space:pre-wrap; word-break:break-all; max-height:120px; overflow:auto; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; font-size:12px; }
-  .spin { color:var(--accent); }
+  :root{
+    --bg:#1b1511; --bg-2:#211a14; --panel:#251d16; --panel-2:#2c2219;
+    --border:#3a2d22; --border-2:#4a3a2b;
+    --ink:#f0e8dd; --muted:#a2917f; --muted-2:#7d6d5c;
+    --accent:#e0913f; --accent-ink:#1b1511; --accent-soft:#3a2a18;
+    --danger:#e07a5f; --ok:#7faa6c;
+    --serif:"Cinzel", Georgia, serif; --sans:"Work Sans", system-ui, sans-serif;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:15px; line-height:1.6;}
+  a{color:var(--accent)}
+  .serif{font-family:var(--serif)}
+  .muted{color:var(--muted)}
+
+  /* Header */
+  header{position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between;
+    gap:20px; padding:14px 28px; background:rgba(27,21,17,.92); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);}
+  .brand{display:flex; align-items:center; gap:12px}
+  .brand .logo{width:44px; height:44px; border-radius:11px; background:linear-gradient(160deg,#eaa053,#c9762c);
+    display:grid; place-items:center; color:#1b1511; box-shadow:0 2px 12px rgba(224,145,63,.25)}
+  .brand h1{font-family:var(--serif); font-weight:700; font-size:22px; margin:0; letter-spacing:.02em}
+  .brand p{margin:0; font-size:12.5px; color:var(--muted)}
+
+  /* Step indicator */
+  .steps{display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+  .step{display:flex; align-items:center; gap:8px; color:var(--muted-2); font-size:13px; white-space:nowrap}
+  .step .dot{width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-size:12px;
+    font-weight:600; background:var(--panel-2); color:var(--muted); border:1px solid var(--border-2)}
+  .step.active{color:var(--ink)}
+  .step.active .dot{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+  .step.done .dot{background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
+  .step .sep{width:26px; height:1px; background:var(--border-2)}
+  .quit{background:transparent; border:1px solid var(--border-2); color:var(--muted); border-radius:8px;
+    padding:7px 12px; cursor:pointer; font-family:var(--sans); font-size:13px; display:none}
+  .quit:hover{color:var(--ink); border-color:var(--accent)}
+
+  main{max-width:900px; margin:0 auto; padding:36px 24px 80px}
+
+  /* Tabs */
+  .tabs{display:flex; gap:26px; border-bottom:1px solid var(--border); margin-bottom:30px}
+  .tab{background:none; border:0; color:var(--muted); font-family:var(--sans); font-weight:600; font-size:15px;
+    padding:0 0 12px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px}
+  .tab.active{color:var(--ink); border-bottom-color:var(--accent)}
+
+  h2.title{font-family:var(--serif); font-weight:600; font-size:30px; letter-spacing:.03em; margin:0 0 12px;
+    text-transform:uppercase}
+  .lead{color:var(--muted); max-width:60ch; margin:0 0 22px}
+
+  textarea, input, select{width:100%; background:var(--bg-2); color:var(--ink); border:1px solid var(--border);
+    border-radius:var(--radius); padding:14px; font:inherit; font-family:var(--sans)}
+  textarea{resize:vertical; min-height:150px}
+  textarea:focus, input:focus, select:focus{outline:none; border-color:var(--accent)}
+  label{display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:0 0 6px}
+
+  .eyebrow{font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted-2); margin:22px 0 10px}
+  .chips{display:flex; flex-direction:column; gap:9px; align-items:flex-start}
+  .chip{background:var(--panel); border:1px solid var(--border); color:var(--ink); border-radius:999px;
+    padding:9px 16px; cursor:pointer; font:inherit; text-align:left; transition:.15s}
+  .chip:hover{border-color:var(--accent); background:var(--panel-2)}
+
+  details.adv{margin:22px 0 6px}
+  details.adv>summary{cursor:pointer; color:var(--muted); list-style:none; font-size:14px}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary::before{content:"▸ "; color:var(--accent)}
+  details.adv[open]>summary::before{content:"▾ "}
+  .adv-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:14px}
+  @media(max-width:620px){.adv-grid{grid-template-columns:1fr}}
+
+  .actions{margin-top:26px; display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+  button.primary{background:var(--accent); color:var(--accent-ink); border:0; border-radius:9px;
+    padding:13px 22px; font-family:var(--sans); font-weight:600; font-size:15px; cursor:pointer;
+    box-shadow:0 2px 14px rgba(224,145,63,.22)}
+  button.primary:hover{filter:brightness(1.05)}
+  button.ghost{background:transparent; border:1px solid var(--border-2); color:var(--ink); border-radius:9px;
+    padding:12px 18px; font-family:var(--sans); font-weight:600; cursor:pointer}
+  button.ghost:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5; cursor:default}
+
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:22px}
+  .codebox{position:relative; background:var(--bg-2); border:1px solid var(--border); border-radius:10px;
+    padding:14px; font-family:ui-monospace, monospace; font-size:12.5px; white-space:pre-wrap; word-break:break-all;
+    max-height:300px; overflow:auto; color:#d8ccbe}
+
+  .hint{display:flex; gap:12px; background:var(--accent-soft); border:1px solid #5a4327; border-radius:10px;
+    padding:14px 16px; margin:16px 0; color:#f0d9bd; font-size:14px}
+  .hint b{color:#f6e6cf}
+
+  .preview{display:flex; align-items:center; justify-content:center; min-height:320px; background:var(--bg-2);
+    border:1px solid var(--border); border-radius:12px; padding:12px}
+  .preview img{max-width:100%; image-rendering:pixelated; border-radius:6px}
+
+  .err{color:#f2b8a6; background:#3a201a; border:1px solid #5c2f24; border-radius:8px; padding:10px 12px; margin-top:12px; font-size:14px; display:none}
+
+  .howto{margin-top:60px; border-top:1px solid var(--border); padding-top:28px}
+  .howto h3{font-family:var(--serif); text-transform:uppercase; letter-spacing:.06em; font-size:15px; color:var(--muted); margin:0 0 20px}
+  .howto-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:26px}
+  @media(max-width:700px){.howto-grid{grid-template-columns:1fr}}
+  .howto .num{width:30px; height:30px; border-radius:7px; background:var(--accent-soft); color:var(--accent);
+    display:grid; place-items:center; font-family:var(--serif); font-weight:700; margin-bottom:10px}
+  .howto h4{margin:0 0 4px; font-size:15px}
+  .howto p{margin:0; color:var(--muted); font-size:14px}
+
+  .slices{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .row{display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap}
+  .row>*{flex:1; min-width:260px}
+  .copybtn{position:absolute; top:10px; right:10px; background:var(--panel-2); z-index:2}
+  #promptBox{padding-top:46px}
+  .hidden{display:none !important}
 </style>
 </head>
 <body>
 <header>
-  <h1>TaleSpire map generator</h1>
-  <p>Décris une scène en français, ajuste-la à la conversation, exporte le code TaleSpire.</p>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l6-2 8 2 6-2v16l-6 2-8-2-6 2z"/><path d="M8 3v18M16 5v18"/></svg>
+    </div>
+    <div>
+      <h1>Le Cartographe</h1>
+      <p>Générateur de cartes pour TaleSpire</p>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:16px">
+    <nav class="steps" id="steps">
+      <div class="step" data-step="1"><span class="dot">1</span><span>Décrire</span></div>
+      <span class="sep"></span>
+      <div class="step" data-step="2"><span class="dot">2</span><span>Générer le prompt</span></div>
+      <span class="sep"></span>
+      <div class="step" data-step="3"><span class="dot">3</span><span>Charger le JSON</span></div>
+      <span class="sep"></span>
+      <div class="step" data-step="4"><span class="dot">4</span><span>Carte prête</span></div>
+    </nav>
+    <button class="quit" id="quit">Quitter</button>
+  </div>
 </header>
 
 <main>
-  <section class="panel" style="display:flex; flex-direction:column; gap:10px;">
-    <div>
-      <h2>Décrire</h2>
-      <label for="desc">Description</label>
-      <textarea id="desc" rows="4" placeholder="une cour de château en ruines, une mare au centre, un chemin qui monte vers des vestiges au nord"></textarea>
-      <div class="row">
-        <div><label for="w">Largeur</label><input id="w" type="number" value="50" min="8" max="200"></div>
-        <div><label for="l">Longueur</label><input id="l" type="number" value="50" min="8" max="200"></div>
-        <div><label for="biome">Biome (option)</label>
+  <!-- STEP 1 — Describe -->
+  <section id="s1">
+    <div class="tabs">
+      <button class="tab active" id="tabDescribe">Décrire ma scène</button>
+      <button class="tab" id="tabJson">J'ai déjà un JSON</button>
+    </div>
+
+    <h2 class="title">Décrivez la carte que vous imaginez</h2>
+    <p class="lead">Racontez la scène comme à votre table de jeu : le décor, l'ambiance, les éléments clés. Le Cartographe prépare un prompt prêt à confier à votre assistant IA.</p>
+
+    <textarea id="desc" placeholder="Ex. Une cour de château en ruines, une mare au sud, des vestiges au nord…"></textarea>
+
+    <div class="eyebrow">Ou partez d'un exemple</div>
+    <div class="chips" id="examples">
+      <button class="chip">Une cour de château en ruines, une mare au sud, des vestiges au nord.</button>
+      <button class="chip">Une clairière de forêt tempérée avec un étang paisible et un chemin de pierre.</button>
+      <button class="chip">Un désert aride avec des dunes, une oasis cachée et des ruines antiques.</button>
+      <button class="chip">Un marécage brumeux avec des huttes sur pilotis et un autel oublié.</button>
+    </div>
+
+    <details class="adv">
+      <summary>Options avancées</summary>
+      <div class="adv-grid">
+        <div><label for="w">Largeur (tuiles)</label><input id="w" type="number" value="50" min="8" max="200"></div>
+        <div><label for="l">Longueur (tuiles)</label><input id="l" type="number" value="50" min="8" max="200"></div>
+        <div><label for="biome">Biome imposé</label>
           <select id="biome">
-            <option value="">auto</option>
-            <option>temperate_forest</option><option>subtropical_forest</option>
-            <option>dead_forest</option><option>swamp</option><option>desert</option>
-            <option>tundra</option><option>lava</option><option>beach</option>
+            <option value="">Laisser l'IA choisir</option>
+            <option value="temperate_forest">Forêt tempérée</option>
+            <option value="subtropical_forest">Forêt subtropicale</option>
+            <option value="dead_forest">Forêt morte</option>
+            <option value="swamp">Marécage</option>
+            <option value="desert">Désert</option>
+            <option value="tundra">Toundra</option>
+            <option value="lava">Volcanique</option>
+            <option value="beach">Plage</option>
           </select>
         </div>
       </div>
-      <div style="margin-top:10px;"><button id="gen">Générer</button></div>
-    </div>
+    </details>
 
-    <div>
-      <h2>Ajuster</h2>
-      <div id="chat"></div>
-      <div class="row">
-        <input id="adjust" placeholder="déplace la mare plus au sud" style="flex:3;">
-        <button id="send" class="secondary" style="flex:1;">Envoyer</button>
+    <div class="actions">
+      <button class="primary" id="genPrompt">Générer le prompt →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2 — Prompt to copy -->
+  <section id="s2" class="hidden">
+    <h2 class="title">Confiez ce prompt à votre IA</h2>
+    <p class="lead">Copiez le prompt ci-dessous et collez-le dans l'assistant IA de votre choix (ChatGPT, Claude, Gemini…). Il vous renverra un JSON : copiez-le, puis passez à l'étape suivante.</p>
+    <div class="card">
+      <div class="codebox" id="promptBox"><button class="ghost copybtn" id="copyPrompt">Copier</button><span id="promptText"></span></div>
+    </div>
+    <div class="hint"><span>💡</span><span><b>Astuce :</b> demandez à l'IA de ne renvoyer <b>que</b> le JSON. Le prompt le lui précise déjà.</span></div>
+    <div class="actions">
+      <button class="ghost" id="backTo1">← Modifier la description</button>
+      <button class="primary" id="goTo3">J'ai le JSON →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3 — Load JSON -->
+  <section id="s3" class="hidden">
+    <h2 class="title">Chargez le JSON de la carte</h2>
+    <p class="lead">Collez le JSON renvoyé par votre IA (ou le vôtre). Le Cartographe le valide, dessine la carte et prépare le code TaleSpire.</p>
+    <textarea id="jsonIn" placeholder='{ "map": { "width": 50, "length": 50, "name": "…", "biome": "temperate_forest" }, "zones": [ … ] }'></textarea>
+    <div class="err" id="jsonErr"></div>
+    <div class="actions">
+      <button class="ghost" id="backTo1b">← Recommencer</button>
+      <button class="primary" id="drawMap">Afficher la carte →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4 — Map ready -->
+  <section id="s4" class="hidden">
+    <h2 class="title" id="mapTitle">Carte prête</h2>
+    <div class="row">
+      <div>
+        <label>Aperçu 2D (vue du dessus)</label>
+        <div class="preview" id="preview"><span class="muted">—</span></div>
+      </div>
+      <div>
+        <label>Code TaleSpire <button class="ghost copybtn" style="position:static; float:right; padding:5px 12px" id="copyCode">Copier</button></label>
+        <div class="codebox" id="codeBox" style="max-height:200px">—</div>
+        <div id="slicesWrap" class="hidden">
+          <div class="eyebrow" id="slicesLabel"></div>
+          <div class="slices" id="slices"></div>
+        </div>
+        <div class="hint"><span>🎲</span><span>Dans TaleSpire, ouvre un board et <b>Ctrl/Cmd + V</b> pour coller la carte.</span></div>
       </div>
     </div>
+    <div class="actions">
+      <button class="ghost" id="restart">← Nouvelle carte</button>
+      <button class="ghost" id="editJson">Ajuster le JSON</button>
+    </div>
   </section>
 
-  <section style="display:flex; flex-direction:column; gap:16px;">
-    <div class="panel">
-      <h2>Aperçu 2D</h2>
-      <div class="preview" id="preview"><span class="muted">Aucune carte pour l'instant.</span></div>
+  <!-- How it works -->
+  <div class="howto" id="howto">
+    <h3>Comment ça marche</h3>
+    <div class="howto-grid">
+      <div><div class="num">1</div><h4>Décrivez la scène</h4><p>Biome, ambiance, points clés : comme à un MJ.</p></div>
+      <div><div class="num">2</div><h4>Générez avec votre IA</h4><p>Copiez le prompt préparé, collez-le, récupérez le JSON.</p></div>
+      <div><div class="num">3</div><h4>Chargez et jouez</h4><p>Déposez le JSON, affichez la carte, exportez vers TaleSpire.</p></div>
     </div>
-    <div class="panel">
-      <h2>Code TaleSpire <button id="copy" class="secondary" style="float:right; padding:4px 10px;">Copier</button></h2>
-      <pre id="code" class="muted">—</pre>
-      <div id="slices"></div>
-    </div>
-    <div class="panel">
-      <h2>IR (éditable)</h2>
-      <textarea id="ir" rows="10" spellcheck="false" class="muted"></textarea>
-      <div style="margin-top:8px;"><button id="apply" class="secondary">Appliquer l'IR édité</button></div>
-    </div>
-  </section>
+  </div>
 </main>
 
 <script>
-let session = "";
-
 const $ = (id) => document.getElementById(id);
-const chat = $("chat");
+let currentStep = 1;
+let lastJSON = "";
 
-function log(text, cls) {
-  const d = document.createElement("div");
-  d.className = "msg " + (cls || "sys");
-  d.textContent = text;
-  chat.appendChild(d);
-  chat.scrollTop = chat.scrollHeight;
+function setStep(n){
+  currentStep = n;
+  for (const el of document.querySelectorAll('.step')){
+    const s = +el.dataset.step;
+    el.classList.toggle('active', s === n);
+    el.classList.toggle('done', s < n);
+  }
+  for (const [i, id] of [[1,'s1'],[2,'s2'],[3,'s3'],[4,'s4']]){
+    $(id).classList.toggle('hidden', i !== n);
+  }
+  $('howto').classList.toggle('hidden', n === 4);
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
-function busy(on) {
-  for (const b of document.querySelectorAll("button")) b.disabled = on;
-}
-
-async function postJSON(url, body) {
-  const r = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+async function postJSON(url, body){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const data = await r.json().catch(()=> ({}));
+  if(!r.ok) throw new Error(data.error || ('HTTP '+r.status));
   return data;
 }
-
-function render(data) {
-  session = data.session;
-  $("preview").innerHTML = "";
-  const img = new Image();
-  img.src = data.preview_url;
-  $("preview").appendChild(img);
-  $("code").textContent = data.code;
-  $("code").classList.remove("muted");
-  $("ir").value = JSON.stringify(data.ir, null, 2);
-
-  const slicesBox = $("slices");
-  slicesBox.innerHTML = "";
-  if (data.slices && data.slices.length) {
-    const n = data.slices.length, m = data.slices[0].length;
-    const p = document.createElement("p");
-    p.className = "muted";
-    p.textContent = `Découpé en ${n}×${m} slabs (limite TaleSpire ~30 ko). Colle chaque slab côte à côte :`;
-    slicesBox.appendChild(p);
-    for (let x = 0; x < n; x++) for (let y = 0; y < m; y++) {
-      const b = document.createElement("button");
-      b.className = "secondary";
-      b.style.margin = "2px";
-      b.textContent = `copier [${x},${y}]`;
-      b.onclick = () => navigator.clipboard.writeText(data.slices[x][y]).then(() => log(`Slice [${x},${y}] copiée.`));
-      slicesBox.appendChild(b);
-    }
-  }
-
-  if (data.warnings && data.warnings.length) data.warnings.forEach(w => log("⚠ " + w, "err"));
+async function copy(text, btn){
+  try{ await navigator.clipboard.writeText(text); const t=btn.textContent; btn.textContent='Copié ✓'; setTimeout(()=>btn.textContent=t, 1400);}catch{ btn.textContent='⚠'; }
 }
 
-$("gen").onclick = async () => {
-  const description = $("desc").value.trim();
-  if (!description) return;
-  busy(true); log("Génération : " + description, "user");
-  try {
-    const data = await postJSON("/api/describe", {
-      description, width:+$("w").value, length:+$("l").value, biome:$("biome").value,
-    });
-    render(data);
-    if (data.attempts > 1) log("IR valide après " + data.attempts + " tentatives.");
-    else log("Carte générée.");
-  } catch (e) { log("Erreur : " + e.message, "err"); }
-  busy(false);
+// Examples fill the textarea
+for (const c of $('examples').querySelectorAll('.chip')){
+  c.onclick = () => { $('desc').value = c.textContent.trim(); $('desc').focus(); };
+}
+
+// Tabs
+$('tabDescribe').onclick = () => { $('tabDescribe').classList.add('active'); $('tabJson').classList.remove('active'); setStep(1); };
+$('tabJson').onclick = () => { $('tabJson').classList.add('active'); $('tabDescribe').classList.remove('active'); setStep(3); };
+
+// Step 1 -> 2 : build the prompt
+$('genPrompt').onclick = async () => {
+  const description = $('desc').value.trim();
+  if(!description){ $('desc').focus(); return; }
+  $('genPrompt').disabled = true; $('genPrompt').textContent = 'Préparation…';
+  try{
+    const data = await postJSON('/api/prompt', {description, width:+$('w').value, length:+$('l').value, biome:$('biome').value});
+    $('promptText').textContent = data.prompt;
+    setStep(2);
+  }catch(e){ alert('Erreur : ' + e.message); }
+  $('genPrompt').disabled = false; $('genPrompt').textContent = 'Générer le prompt →';
 };
+$('copyPrompt').onclick = () => copy($('promptText').textContent, $('copyPrompt'));
+$('backTo1').onclick = () => setStep(1);
+$('goTo3').onclick = () => setStep(3);
 
-$("send").onclick = async () => {
-  const message = $("adjust").value.trim();
-  if (!message) return;
-  if (!session) { log("Génère d'abord une carte.", "err"); return; }
-  busy(true); log(message, "user"); $("adjust").value = "";
-  try {
-    render(await postJSON("/api/adjust", { session, message }));
-    log("Ajustement appliqué.");
-  } catch (e) { log("Erreur : " + e.message, "err"); }
-  busy(false);
-};
-
-$("adjust").addEventListener("keydown", (e) => { if (e.key === "Enter") $("send").click(); });
-
-$("apply").onclick = async () => {
+// Step 3 -> 4 : draw the map from JSON
+$('backTo1b').onclick = () => setStep(1);
+$('drawMap').onclick = async () => {
+  $('jsonErr').style.display = 'none';
   let parsed;
-  try { parsed = JSON.parse($("ir").value); }
-  catch (e) { log("IR invalide : " + e.message, "err"); return; }
-  busy(true);
-  try { render(await postJSON("/api/generate", { session, ir: parsed })); log("IR appliqué."); }
-  catch (e) { log("Erreur : " + e.message, "err"); }
-  busy(false);
+  try{ parsed = JSON.parse($('jsonIn').value); }
+  catch(e){ showJsonErr('JSON invalide : ' + e.message); return; }
+  $('drawMap').disabled = true; $('drawMap').textContent = 'Génération…';
+  try{
+    const data = await postJSON('/api/generate', {ir: parsed});
+    renderMap(data);
+    setStep(4);
+  }catch(e){ showJsonErr('Carte refusée : ' + e.message); }
+  $('drawMap').disabled = false; $('drawMap').textContent = 'Afficher la carte →';
 };
+function showJsonErr(m){ const e=$('jsonErr'); e.textContent=m; e.style.display='block'; }
 
-$("copy").onclick = async () => {
-  const code = $("code").textContent;
-  if (!code || code === "—") return;
-  try { await navigator.clipboard.writeText(code); log("Code copié dans le presse-papier."); }
-  catch { log("Copie impossible (permission).", "err"); }
-};
+function renderMap(data){
+  lastJSON = JSON.stringify(data.ir, null, 2);
+  $('mapTitle').textContent = (data.ir && data.ir.map && data.ir.map.name) ? data.ir.map.name : 'Carte prête';
+  $('preview').innerHTML = ''; const img = new Image(); img.src = data.preview_url; $('preview').appendChild(img);
+  $('codeBox').textContent = data.code || '—';
+  // slices
+  const wrap = $('slicesWrap'), box = $('slices');
+  box.innerHTML = '';
+  if (data.slices && data.slices.length){
+    const n = data.slices.length, m = data.slices[0].length;
+    $('slicesLabel').textContent = `Découpé en ${n}×${m} slabs (limite ~30 ko) — colle chacun côte à côte`;
+    for (let x=0;x<n;x++) for (let y=0;y<m;y++){
+      const b = document.createElement('button'); b.className='chip'; b.style.padding='6px 12px';
+      b.textContent = `copier [${x},${y}]`;
+      b.onclick = () => copy(data.slices[x][y], b);
+      box.appendChild(b);
+    }
+    wrap.classList.remove('hidden');
+  } else { wrap.classList.add('hidden'); }
+  if (data.warnings) data.warnings.forEach(w => console.warn(w));
+}
+$('copyCode').onclick = () => copy($('codeBox').textContent, $('copyCode'));
+$('restart').onclick = () => { $('jsonIn').value=''; setStep(1); };
+$('editJson').onclick = () => { $('jsonIn').value = lastJSON; setStep(3); };
+
+// Capabilities: show Quit when the desktop launcher wired it.
+fetch('/api/config').then(r=>r.json()).then(cfg => {
+  if (cfg.quit_enabled){
+    const q = $('quit'); q.style.display='';
+    q.onclick = async () => {
+      await fetch('/api/quit', {method:'POST'}).catch(()=>{});
+      document.body.innerHTML = '<div style="padding:80px;text-align:center;color:#a2917f;font-family:Work Sans,sans-serif">Application arrêtée. Vous pouvez fermer cet onglet.</div>';
+    };
+  }
+}).catch(()=>{});
+
+setStep(1);
 </script>
 </body>
 </html>

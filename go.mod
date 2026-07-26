@@ -6,6 +6,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.60.0
 	github.com/johnfercher/talescoder v1.0.5
 	github.com/johnfercher/taleslab v0.0.0-20230920132440-67c6387663c6
+	github.com/joho/godotenv v1.5.1
 )
 
 require (

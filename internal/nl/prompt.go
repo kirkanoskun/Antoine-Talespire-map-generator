@@ -89,6 +89,25 @@ func userPrompt(description string, width, length int, name, forcedBiome string)
 	return b.String()
 }
 
+// BuildPrompt returns a single self-contained prompt the user can paste into any
+// AI assistant (ChatGPT, Claude, …) to get back a valid IR JSON — the "bring
+// your own AI" flow, which needs no API key. It combines the schema, the
+// one-biome rules and the catalogue (the same system prompt used for direct API
+// calls) with the scene description and map parameters.
+func (c *Catalog) BuildPrompt(description string, opts Options) string {
+	if opts.Width <= 0 {
+		opts.Width = 50
+	}
+	if opts.Length <= 0 {
+		opts.Length = 50
+	}
+	var b strings.Builder
+	b.WriteString(c.systemPrompt())
+	b.WriteString("\n\n=====\n\n")
+	b.WriteString(userPrompt(description, opts.Width, opts.Length, opts.Name, opts.ForcedBiome))
+	return b.String()
+}
+
 // adjustPrompt frames a conversational edit: the current IR plus the change to
 // apply. The model must return the whole updated IR (same rules), changing only
 // what the instruction asks for.

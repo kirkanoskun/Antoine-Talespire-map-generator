@@ -66,7 +66,7 @@ func TestIndexServed(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("index status %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "TaleSpire map generator") {
+	if !strings.Contains(rec.Body.String(), "Le Cartographe") {
 		t.Error("index page missing title")
 	}
 }
