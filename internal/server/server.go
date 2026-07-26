@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,7 @@ var staticFS embed.FS
 // Server holds the generation dependencies and the live sessions.
 type Server struct {
 	gen         *generator.Generator
+	catalog     *nl.Catalog     // for the keyless prompt-generation flow
 	interp      *nl.Interpreter // may be nil if no NL backend is configured
 	previewOpts preview.Options
 	maxRetries  int
@@ -52,6 +54,8 @@ type session struct {
 
 // Options configures a Server.
 type Options struct {
+	// Catalog powers the keyless "generate a prompt" flow (the mockup's default).
+	Catalog      *nl.Catalog
 	Interpreter  *nl.Interpreter
 	PreviewScale int
 	MaxRetries   int
@@ -72,6 +76,7 @@ func New(gen *generator.Generator, opts Options) *Server {
 	gen.SetSliceSize(opts.SliceSize)
 	return &Server{
 		gen:         gen,
+		catalog:     opts.Catalog,
 		interp:      opts.Interpreter,
 		previewOpts: preview.Options{Scale: scale},
 		maxRetries:  opts.MaxRetries,
@@ -84,6 +89,7 @@ func New(gen *generator.Generator, opts Options) *Server {
 // Handler returns the HTTP handler for the whole app.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/prompt", s.handlePrompt)
 	mux.HandleFunc("/api/describe", s.handleDescribe)
 	mux.HandleFunc("/api/adjust", s.handleAdjust)
 	mux.HandleFunc("/api/generate", s.handleGenerate)
@@ -98,8 +104,9 @@ func (s *Server) Handler() http.Handler {
 // available (describe/adjust) and whether the Quit button applies.
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{
-		"nl_enabled":   s.interp != nil,
-		"quit_enabled": s.onQuit != nil,
+		"prompt_enabled": s.catalog != nil,
+		"nl_enabled":     s.interp != nil,
+		"quit_enabled":   s.onQuit != nil,
 	})
 }
 
@@ -143,6 +150,32 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(data)
+}
+
+// handlePrompt builds the pasteable AI prompt for a scene description — the
+// keyless flow (the mockup's default). No Anthropic credential is involved.
+func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Description string `json:"description"`
+		Width       int    `json:"width"`
+		Length      int    `json:"length"`
+		Biome       string `json:"biome"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if s.catalog == nil {
+		writeError(w, http.StatusServiceUnavailable, "catalogue unavailable")
+		return
+	}
+	if strings.TrimSpace(req.Description) == "" {
+		writeError(w, http.StatusBadRequest, "description is empty")
+		return
+	}
+	prompt := s.catalog.BuildPrompt(req.Description, nl.Options{
+		Width: req.Width, Length: req.Length, ForcedBiome: req.Biome,
+	})
+	writeJSON(w, http.StatusOK, map[string]string{"prompt": prompt})
 }
 
 // handleDescribe: natural language -> IR -> map, in a new session.

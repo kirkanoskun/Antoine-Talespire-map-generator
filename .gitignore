@@ -2,6 +2,10 @@
 /out/
 /dist/
 *.exe
+# Stray dev binaries from `go build` in the repo root.
+/server
+/describe
+/generate
 
 # Go
 /vendor/

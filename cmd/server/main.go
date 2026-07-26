@@ -77,6 +77,7 @@ func main() {
 
 	httpSrv := &http.Server{}
 	srv := server.New(gen, server.Options{
+		Catalog:      catalog,
 		Interpreter:  interp,
 		PreviewScale: *scale,
 		MaxRetries:   *maxRetries,
