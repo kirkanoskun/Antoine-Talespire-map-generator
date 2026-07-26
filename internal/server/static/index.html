@@ -37,9 +37,12 @@
 </style>
 </head>
 <body>
-<header>
-  <h1>TaleSpire map generator</h1>
-  <p>Décris une scène en français, ajuste-la à la conversation, exporte le code TaleSpire.</p>
+<header style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+  <div>
+    <h1>TaleSpire map generator</h1>
+    <p>Décris une scène en français, ajuste-la à la conversation, exporte le code TaleSpire.</p>
+  </div>
+  <button id="quit" class="secondary" style="display:none; white-space:nowrap;">Quitter l'app</button>
 </header>
 
 <main>
@@ -96,6 +99,20 @@ let session = "";
 
 const $ = (id) => document.getElementById(id);
 const chat = $("chat");
+
+// Show the Quit button only when the desktop launcher wired a shutdown.
+fetch("/api/config").then(r => r.json()).then(cfg => {
+  if (cfg.quit_enabled) {
+    const q = $("quit");
+    q.style.display = "";
+    q.onclick = async () => {
+      await fetch("/api/quit", { method: "POST" }).catch(() => {});
+      document.body.innerHTML =
+        '<div style="padding:60px;text-align:center;color:#9aa4b2;font:16px system-ui;">' +
+        "Application arrêtée. Tu peux fermer cet onglet.</div>";
+    };
+  }
+}).catch(() => {});
 
 function log(text, cls) {
   const d = document.createElement("div");

@@ -224,6 +224,16 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.
+- **Desktop app packaging.** `cmd/server` is the double-click app: it embeds the
+  UI (`go:embed`) and the asset catalogues (root `embed.go` → written to a temp
+  dir at startup, so no working-directory dependency), binds `127.0.0.1` (with an
+  ephemeral-port fallback), auto-opens the browser, and exposes `/api/quit`
+  (wired to a graceful `http.Server.Shutdown` via `Options.OnQuit`) so the UI's
+  Quit button can stop it — there is no terminal to Ctrl+C when double-clicked.
+  `.env` is loaded from cwd, next to the executable, and `~/.talespire/.env` (a
+  GUI app inherits no shell env). `scripts/build-{mac,windows}.sh` produce a
+  `.app` bundle and a no-console `.exe`. The generation logic is untouched — this
+  is packaging only.
 
 ### Phase 3 stitching notes
 

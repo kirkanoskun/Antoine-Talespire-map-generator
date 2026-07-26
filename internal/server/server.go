@@ -36,6 +36,7 @@ type Server struct {
 	previewOpts preview.Options
 	maxRetries  int
 	seed        int64
+	onQuit      func()
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -56,6 +57,10 @@ type Options struct {
 	MaxRetries   int
 	Seed         int64
 	SliceSize    int
+	// OnQuit, if set, is invoked when the UI's Quit button hits /api/quit.
+	// The desktop launcher uses it to shut the local server down cleanly (there
+	// is no terminal to Ctrl+C when the app is double-clicked).
+	OnQuit func()
 }
 
 // New builds a server around a generator and (optionally) an NL interpreter.
@@ -71,6 +76,7 @@ func New(gen *generator.Generator, opts Options) *Server {
 		previewOpts: preview.Options{Scale: scale},
 		maxRetries:  opts.MaxRetries,
 		seed:        opts.Seed,
+		onQuit:      opts.OnQuit,
 		sessions:    map[string]*session{},
 	}
 }
@@ -82,8 +88,37 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/adjust", s.handleAdjust)
 	mux.HandleFunc("/api/generate", s.handleGenerate)
 	mux.HandleFunc("/api/preview", s.handlePreview)
+	mux.HandleFunc("/api/quit", s.handleQuit)
+	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/", s.handleIndex)
 	return mux
+}
+
+// handleConfig exposes UI-relevant capabilities: whether an NL backend is
+// available (describe/adjust) and whether the Quit button applies.
+func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]bool{
+		"nl_enabled":   s.interp != nil,
+		"quit_enabled": s.onQuit != nil,
+	})
+}
+
+// QuitEnabled reports whether the Quit button should be shown (a shutdown
+// callback is wired). The UI hides the button otherwise (e.g. `go run`).
+func (s *Server) QuitEnabled() bool { return s.onQuit != nil }
+
+// handleQuit lets the desktop UI shut the local server down cleanly.
+func (s *Server) handleQuit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	if s.onQuit == nil {
+		writeError(w, http.StatusNotFound, "quit is not enabled")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting down"})
+	go s.onQuit()
 }
 
 type genResponse struct {
