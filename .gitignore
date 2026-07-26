@@ -5,6 +5,9 @@
 # Go
 /vendor/
 
+# Secrets — never commit real keys. See .env.example.
+.env
+
 # Editor / OS
 .DS_Store
 .idea/
