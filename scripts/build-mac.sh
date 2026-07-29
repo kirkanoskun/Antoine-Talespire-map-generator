@@ -1,9 +1,28 @@
 #!/usr/bin/env bash
 # Build a double-clickable macOS app: "TaleSpire Map Generator.app".
-# Run this ON a Mac (needs the Go toolchain; `lipo` is used for a universal
-# binary when available). Output goes to dist/.
+# Run this ON a Mac (needs the Go toolchain). Output goes to dist/.
+#
+# By default it builds ONLY for the current machine's architecture (detected via
+# `uname -m`), so it needs nothing but the Go toolchain — no Xcode Command Line
+# Tools, no `lipo`. Pass --universal to instead build a fat Intel+Apple-Silicon
+# binary; that path requires `lipo` (from the Command Line Tools).
+#
+# Usage: scripts/build-mac.sh [--universal]
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+UNIVERSAL=0
+for arg in "$@"; do
+  case "$arg" in
+    --universal) UNIVERSAL=1 ;;
+    -h|--help)
+      echo "Usage: scripts/build-mac.sh [--universal]"
+      echo "  (default)     build for this machine's architecture only (no lipo needed)"
+      echo "  --universal   build a universal Intel+Apple-Silicon binary (needs lipo)"
+      exit 0 ;;
+    *) echo "Unknown argument: $arg" >&2; echo "Usage: scripts/build-mac.sh [--universal]" >&2; exit 2 ;;
+  esac
+done
 
 APP_NAME="TaleSpire Map Generator"
 BIN_NAME="talespire-map-generator"
@@ -16,19 +35,27 @@ MACOS="$APP/Contents/MacOS"
 rm -rf "$APP"
 mkdir -p "$MACOS"
 
-echo "Building binaries..."
-GOOS=darwin GOARCH=arm64 go build -trimpath -o "$DIST/${BIN_NAME}-arm64" ./cmd/server
-GOOS=darwin GOARCH=amd64 go build -trimpath -o "$DIST/${BIN_NAME}-amd64" ./cmd/server
-
-if command -v lipo >/dev/null 2>&1; then
-  echo "Creating universal binary..."
+if [ "$UNIVERSAL" -eq 1 ]; then
+  if ! command -v lipo >/dev/null 2>&1; then
+    echo "error: --universal needs 'lipo' (Xcode Command Line Tools), which was not found." >&2
+    echo "       Run without --universal to build for this machine's architecture only." >&2
+    exit 1
+  fi
+  echo "Building universal binary (arm64 + amd64)..."
+  GOOS=darwin GOARCH=arm64 go build -trimpath -o "$DIST/${BIN_NAME}-arm64" ./cmd/server
+  GOOS=darwin GOARCH=amd64 go build -trimpath -o "$DIST/${BIN_NAME}-amd64" ./cmd/server
   lipo -create -output "$MACOS/$BIN_NAME" "$DIST/${BIN_NAME}-arm64" "$DIST/${BIN_NAME}-amd64"
   rm -f "$DIST/${BIN_NAME}-arm64" "$DIST/${BIN_NAME}-amd64"
 else
-  echo "lipo not found; using the host-arch binary only."
-  HOST_ARCH="$(uname -m)"; [ "$HOST_ARCH" = "x86_64" ] && HOST_ARCH="amd64" || HOST_ARCH="arm64"
-  mv "$DIST/${BIN_NAME}-${HOST_ARCH}" "$MACOS/$BIN_NAME"
-  rm -f "$DIST/${BIN_NAME}-arm64" "$DIST/${BIN_NAME}-amd64"
+  # Detect the host architecture and build for it alone — no lipo, no
+  # cross-compile of the other arch.
+  case "$(uname -m)" in
+    arm64|aarch64) HOST_ARCH="arm64" ;;
+    x86_64|amd64)  HOST_ARCH="amd64" ;;
+    *) echo "error: unsupported architecture '$(uname -m)'." >&2; exit 1 ;;
+  esac
+  echo "Building for this machine's architecture ($HOST_ARCH)..."
+  GOOS=darwin GOARCH="$HOST_ARCH" go build -trimpath -o "$MACOS/$BIN_NAME" ./cmd/server
 fi
 chmod +x "$MACOS/$BIN_NAME"
 
