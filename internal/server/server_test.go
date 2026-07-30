@@ -71,6 +71,21 @@ func TestIndexServed(t *testing.T) {
 	}
 }
 
+func TestStaticLogoServed(t *testing.T) {
+	h := newServer(t, nil)
+	for _, name := range []string{"logo.png", "emblem.png"} {
+		req := httptest.NewRequest(http.MethodGet, "/static/"+name, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("/static/%s status %d", name, rec.Code)
+		}
+		if !bytes.HasPrefix(rec.Body.Bytes(), []byte("\x89PNG")) {
+			t.Errorf("/static/%s is not a PNG", name)
+		}
+	}
+}
+
 func TestGenerateFromIRThenPreview(t *testing.T) {
 	h := newServer(t, nil)
 	rec, out := post(t, h, "/api/generate", `{"ir":`+cannedIR+`}`)

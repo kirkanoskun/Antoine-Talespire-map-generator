@@ -234,6 +234,18 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   GUI app inherits no shell env). `scripts/build-{mac,windows}.sh` produce a
   `.app` bundle and a no-console `.exe`. The generation logic is untouched — this
   is packaging only.
+- **Branding.** The macOS app is named "Le Cartographe, a TaleSpire Map
+  Generator" (menu-bar name "Le Cartographe"), with the compass/mountains logo
+  as its icon. The `.icns` is committed at `assets/icon.icns` and generated from
+  `assets/logo.png` by `scripts/make-icns.py` (Pillow, no Xcode Command Line
+  Tools needed); `build-mac.sh` copies it into the bundle and sets
+  `CFBundleIconFile` (still builds without it). The same logo lives in the web UI
+  — the emblem in the header mark and the full badge as the landing hero —
+  served from `internal/server/static/` via the `/static/` route.
+- **macOS build is host-arch by default.** `build-mac.sh` detects the host
+  architecture (`uname -m`) and builds only that, so it needs nothing but the Go
+  toolchain (no `lipo`/Command Line Tools). `--universal` still fuses an
+  Intel+Apple-Silicon binary when `lipo` is available.
 
 ### Phase 3 stitching notes
 

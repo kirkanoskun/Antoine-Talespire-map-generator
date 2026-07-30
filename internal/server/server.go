@@ -89,6 +89,7 @@ func New(gen *generator.Generator, opts Options) *Server {
 // Handler returns the HTTP handler for the whole app.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
 	mux.HandleFunc("/api/prompt", s.handlePrompt)
 	mux.HandleFunc("/api/describe", s.handleDescribe)
 	mux.HandleFunc("/api/adjust", s.handleAdjust)

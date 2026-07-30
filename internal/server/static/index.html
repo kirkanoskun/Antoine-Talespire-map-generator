@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Le Cartographe — Générateur de cartes TaleSpire</title>
+<link rel="icon" type="image/png" href="/static/emblem.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -29,10 +30,17 @@
     gap:20px; padding:14px 28px; background:rgba(27,21,17,.92); backdrop-filter:blur(8px);
     border-bottom:1px solid var(--border);}
   .brand{display:flex; align-items:center; gap:12px}
-  .brand .logo{width:44px; height:44px; border-radius:11px; background:linear-gradient(160deg,#eaa053,#c9762c);
-    display:grid; place-items:center; color:#1b1511; box-shadow:0 2px 12px rgba(224,145,63,.25)}
+  .brand .logo{width:46px; height:46px; border-radius:12px; overflow:hidden; background:#181410;
+    display:grid; place-items:center; border:1px solid var(--border-2); box-shadow:0 2px 12px rgba(0,0,0,.35)}
+  .brand .logo img{width:100%; height:100%; object-fit:cover; display:block}
   .brand h1{font-family:var(--serif); font-weight:700; font-size:22px; margin:0; letter-spacing:.02em}
   .brand p{margin:0; font-size:12.5px; color:var(--muted)}
+
+  /* Hero logo on the landing step */
+  .hero-logo{display:flex; justify-content:center; margin:4px 0 22px}
+  .hero-logo img{width:160px; height:160px; border-radius:26px; display:block;
+    filter:drop-shadow(0 10px 30px rgba(0,0,0,.45))}
+  @media (max-width:640px){ .hero-logo img{width:128px; height:128px} }
 
   /* Step indicator */
   .steps{display:flex; align-items:center; gap:6px; flex-wrap:wrap}
@@ -124,8 +132,8 @@
 <body>
 <header>
   <div class="brand">
-    <div class="logo" aria-hidden="true">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l6-2 8 2 6-2v16l-6 2-8-2-6 2z"/><path d="M8 3v18M16 5v18"/></svg>
+    <div class="logo">
+      <img src="/static/emblem.png" alt="Le Cartographe">
     </div>
     <div>
       <h1>Le Cartographe</h1>
@@ -149,6 +157,7 @@
 <main>
   <!-- STEP 1 — Describe -->
   <section id="s1">
+    <div class="hero-logo"><img src="/static/logo.png" alt="Le Cartographe — a TaleSpire Map Generator"></div>
     <div class="tabs">
       <button class="tab active" id="tabDescribe">Décrire ma scène</button>
       <button class="tab" id="tabJson">J'ai déjà un JSON</button>
