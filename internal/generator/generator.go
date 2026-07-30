@@ -391,10 +391,21 @@ func (g *Generator) placeProps(out []placement, biome *taleslabentities.Biome, d
 					continue
 				}
 				weight := categoryWeight(zone, cat.override, dist.Weight)
-				// Blend toward the neighbouring zone's density near a border.
+				// Blend toward the neighbouring zone's density near a border. The
+				// neighbour's fallback default must come from *its* relief, not this
+				// tile's — otherwise a ground/mountain seam blends toward the wrong
+				// biome default. When the neighbour overrides its relief we can look
+				// up that relief's weight; otherwise this tile's default is the best
+				// proxy we have (the neighbour's relief is height-derived per tile).
 				if trans != nil {
 					if other, blend := trans.At(x, y); other >= 0 && blend > 0 {
-						ow := categoryWeight(&doc.Zones[other], cat.override, dist.Weight)
+						otherDefault := dist.Weight
+						if ov := doc.Zones[other].ReliefOverride; ov != "" {
+							if orelief := biome.Reliefs[elementtype.ElementType(ov)]; orelief != nil && orelief.PropBlocks != nil {
+								otherDefault = distributionFor(orelief.PropBlocks, cat.elem).Weight
+							}
+						}
+						ow := categoryWeight(&doc.Zones[other], cat.override, otherDefault)
 						weight += (ow - weight) * blend
 					}
 				}
