@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build a double-clickable macOS app: "TaleSpire Map Generator.app".
+# Build a double-clickable macOS app: "Le Cartographe, a TaleSpire Map Generator.app".
 # Run this ON a Mac (needs the Go toolchain). Output goes to dist/.
 #
 # By default it builds ONLY for the current machine's architecture (detected via
@@ -24,14 +24,17 @@ for arg in "$@"; do
   esac
 done
 
-APP_NAME="TaleSpire Map Generator"
+APP_NAME="Le Cartographe, a TaleSpire Map Generator"
+MENU_NAME="Le Cartographe"          # short name for the macOS menu bar
 BIN_NAME="talespire-map-generator"
 BUNDLE_ID="com.kirkanoskun.talespire-map-generator"
 VERSION="1.0"
+ICON_SRC="assets/icon.icns"         # app icon (optional; see scripts/make-icns.py)
 
 DIST="dist"
 APP="$DIST/$APP_NAME.app"
 MACOS="$APP/Contents/MacOS"
+RESOURCES="$APP/Contents/Resources"
 rm -rf "$APP"
 mkdir -p "$MACOS"
 
@@ -59,17 +62,33 @@ else
 fi
 chmod +x "$MACOS/$BIN_NAME"
 
+# App icon: copy the pre-generated .icns into Resources and reference it from
+# Info.plist. The .icns is committed to the repo (built by scripts/make-icns.py),
+# so the Mac needs no icon tooling. If it is missing the app still builds, just
+# with the generic icon.
+ICON_PLIST_LINE=""
+if [ -f "$ICON_SRC" ]; then
+  mkdir -p "$RESOURCES"
+  cp "$ICON_SRC" "$RESOURCES/icon.icns"
+  ICON_PLIST_LINE='  <key>CFBundleIconFile</key><string>icon</string>'
+  echo "Using app icon: $ICON_SRC"
+else
+  echo "note: $ICON_SRC not found; building with the generic app icon."
+  echo "      Generate it with: python3 scripts/make-icns.py assets/logo.png"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>$APP_NAME</string>
+  <key>CFBundleName</key><string>$MENU_NAME</string>
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleExecutable</key><string>$BIN_NAME</string>
+$ICON_PLIST_LINE
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>10.13</string>
   <key>NSHighResolutionCapable</key><true/>
