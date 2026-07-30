@@ -159,7 +159,14 @@
       "props": [
        "pine_tree_big",
        "two_floor_pine_tree",
-       "two_floor_pine_tree_with_trunk"
+       "two_floor_pine_tree_with_trunk",
+       "one_big_tree",
+       "two_big_tree",
+       "three_big_tree",
+       "cut_tree_with_moss",
+       "dead_tree_big",
+       "bush_tree",
+       "tree_trunk"
       ]
      },
      "stones": {
@@ -174,7 +181,10 @@
        "rose",
        "floor_bush",
        "small_fern",
-       "big_fern"
+       "big_fern",
+       "rectangle_bush_small",
+       "many_ground_red_leaves",
+       "few_ground_red_leaves"
       ]
      }
     }
@@ -190,7 +200,14 @@
       "props": [
        "pine_tree_big",
        "two_floor_pine_tree",
-       "two_floor_pine_tree_with_trunk"
+       "two_floor_pine_tree_with_trunk",
+       "one_big_tree",
+       "two_big_tree",
+       "three_big_tree",
+       "cut_tree_with_moss",
+       "dead_tree_big",
+       "bush_tree",
+       "tree_trunk"
       ]
      },
      "stones": {
@@ -205,7 +222,10 @@
        "rose",
        "floor_bush",
        "small_fern",
-       "big_fern"
+       "big_fern",
+       "rectangle_bush_small",
+       "many_ground_red_leaves",
+       "few_ground_red_leaves"
       ]
      }
     }
@@ -221,7 +241,9 @@
       "props": [
        "pine_tree_big",
        "two_floor_pine_tree",
-       "two_floor_pine_tree_with_trunk"
+       "one_big_tree",
+       "dead_tree_big",
+       "tree_trunk"
       ]
      },
      "stones": {
@@ -252,7 +274,9 @@
       "weight": 0.05,
       "props": [
        "small_dead_bush",
-       "floor_bush"
+       "floor_bush",
+       "big_dead_bush",
+       "dead_tree_tiny"
       ]
      },
      "stones": {
@@ -263,168 +287,18 @@
       ]
      },
      "misc": {
-      "weight": 0.12,
+      "weight": 0.08,
       "props": [
-       "pile_of_skulls",
-       "down_skeleton",
-       "up_rib"
-      ]
-     }
-    }
-   }
-  ],
-  "stone_wall": "big_stone_wall"
- },
- {
-  "biome_type": "temperate_forest",
-  "reliefs": [
-   {
-    "key": "water",
-    "building_blocks": [
-     "water"
-    ],
-    "prop_blocks": {
-     "vegetation": {
-      "weight": 0.01,
-      "props": [
-       "coral"
-      ]
-     },
-     "stones": {
-      "weight": 0.01,
-      "props": [
-       "one_small_rock-z0"
-      ]
-     },
-     "misc": {
-      "weight": 0.01,
-      "props": [
-       "orange_fish"
-      ]
-     }
-    }
-   },
-   {
-    "key": "base_ground",
-    "building_blocks": [
-     "mud_small",
-     "ground_nature_small"
-    ],
-    "prop_blocks": {
-     "vegetation": {
-      "weight": 0.2,
-      "props": [
-       "pine_tree_big",
-       "two_floor_pine_tree",
-       "two_floor_pine_tree_with_trunk"
-      ]
-     },
-     "stones": {
-      "weight": 0.05,
-      "props": [
-       "one_small_rock-z1"
-      ]
-     },
-     "misc": {
-      "weight": 0.2,
-      "props": [
-       "rose",
-       "floor_bush",
-       "small_fern",
-       "big_fern"
-      ]
-     }
-    }
-   },
-   {
-    "key": "ground",
-    "building_blocks": [
-     "ground_nature_small"
-    ],
-    "prop_blocks": {
-     "vegetation": {
-      "weight": 0.2,
-      "props": [
-       "pine_tree_big",
-       "two_floor_pine_tree",
-       "two_floor_pine_tree_with_trunk"
-      ]
-     },
-     "stones": {
-      "weight": 0.01,
-      "props": [
-       "stone_big"
-      ]
-     },
-     "misc": {
-      "weight": 0.2,
-      "props": [
-       "rose",
-       "floor_bush",
-       "small_fern",
-       "big_fern"
-      ]
-     }
-    }
-   },
-   {
-    "key": "mountain",
-    "building_blocks": [
-     "ground_nature_small"
-    ],
-    "prop_blocks": {
-     "vegetation": {
-      "weight": 0.1,
-      "props": [
-       "pine_tree_big",
-       "two_floor_pine_tree",
-       "two_floor_pine_tree_with_trunk"
-      ]
-     },
-     "stones": {
-      "weight": 0.01,
-      "props": [
-       "stone_big"
-      ]
-     },
-     "misc": {
-      "weight": 0.01,
-      "props": [
-       "rose",
-       "floor_bush",
-       "small_fern",
-       "big_fern"
-      ]
-     }
-    }
-   },
-   {
-    "key": "ruins",
-    "building_blocks": [
-     "dead_ground_small",
-     "cavern_one_rock"
-    ],
-    "prop_blocks": {
-     "vegetation": {
-      "weight": 0.05,
-      "props": [
+       "big_dead_bush",
        "small_dead_bush",
-       "floor_bush"
-      ]
-     },
-     "stones": {
-      "weight": 0.3,
-      "props": [
-       "big_stone_wall",
-       "stone_big"
-      ]
-     },
-     "misc": {
-      "weight": 0.12,
-      "props": [
+       "floor_bush",
+       "big_fern",
+       "small_fern",
+       "many_ground_red_leaves",
+       "tree_trunk",
+       "cut_tree_with_moss",
        "pile_of_skulls",
-       "down_skeleton",
-       "up_rib"
+       "down_skeleton"
       ]
      }
     }
