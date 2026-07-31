@@ -221,6 +221,14 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   brief's "re-run only affected zones" is unnecessary for compute; the value of
   keeping the IR is that edits are *relative to the current map*, not a fresh
   description. The `/api/generate` path also lets the UI apply hand-edited IR.
+- **Keyless prompt is interactive (v1.03).** `nl.BuildPrompt` (the "Générer le
+  prompt" button) opens with a `# Before anything else: ask 3 clarifying questions`
+  section (density/mood, focal point, circulation) and a relaxed output contract:
+  the assistant asks the three questions and waits before emitting JSON (or skips
+  if told to). This is added only in the interactive prompt — `systemPrompt(false)`
+  used by the automated `/api/describe` path stays single-shot JSON, since its
+  reply must satisfy the validate/retry loop. `nl.PromptVersion` carries the
+  wording revision and is printed at the top of the generated prompt.
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.
