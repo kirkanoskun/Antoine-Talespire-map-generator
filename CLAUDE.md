@@ -299,6 +299,29 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - TaleSpire's max slab size — RESOLVED: ~30 kB per slab, slicing implemented.
   The one remaining unautomatable step is importing a code into a real client.
 
+### Community slab import (exploration, NOT wired in)
+
+- **Goal.** Import real player-made buildings (Tales Tavern / TalesBazaar,
+  "Chimera" format) and drop them into generated maps, chosen from the prompt.
+  The realistic path is a hand-curated, decoded-once library, not live scraping
+  (both sites need a human click to copy a slab code).
+- **Blocker fixed: the Y axis.** `talescoder` v1.0.5 (latest) decodes a real
+  slab's horizontal-depth (Y) axis wrongly. TaleSpire packs each placement as a
+  64-bit little-endian blob with 18-bit fields (X@0, Z@18, Y@36, rot@54, rot in
+  15° steps); talescoder reads byte-aligned 16-bit fields, so Y is 4 bits off and
+  its high bits leak into "rotation". It is only accidentally right for
+  grid-snapped tiles (rawY a multiple of 100), which is why a building's floor
+  decoded fine but its offset/rotated pieces ran to impossible Y (0..1009).
+  Confirmed against LuPro/SlabelFish (the reference Chimera implementation).
+- **`internal/chimera`** is a standalone, tested decoder with the correct bit
+  layout (round-trip + bug-reproduction + full gzip/parse tests). Nothing in the
+  generator imports it. `cmd/slabdecode` vets a pasted slab code (prints axis
+  ranges). Horizontal scale (100 u/tile) is confirmed; the **vertical scale
+  (50 u/tile) still needs an in-game calibration** (import a tile at a known
+  height, read `RawZ`) before buildings are trusted — `Raw*` is exposed so any
+  rescale is lossless. Do not connect this to map generation until validated on
+  a real slab.
+
 ## Conventions
 
 - Keep the pipeline packages thin and composable so an HTTP server (Phase 4) can
