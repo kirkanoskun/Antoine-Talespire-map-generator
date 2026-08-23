@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
@@ -114,6 +115,26 @@ func putInt16(buf *bytes.Buffer, v int16) {
 	b := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, uint16(v))
 	buf.Write(b)
+}
+
+func TestDecodeIgnoresWhitespace(t *testing.T) {
+	id := "AAAQosMB+5SfRIxHmT7aPnEm"
+	code := buildSlab(t, 2, []Asset{{IDBase64: id, Placements: []Placement{{RawX: 0, RawY: 0, RawZ: 0, RotStep: 0}}}})
+	// Simulate a wrapped paste.
+	wrapped := code[:20] + "\n" + code[20:40] + "  \r\n" + code[40:]
+	if _, err := Decode(wrapped); err != nil {
+		t.Errorf("Decode should tolerate whitespace, got: %v", err)
+	}
+}
+
+func TestDecodeReportsTruncation(t *testing.T) {
+	id := "AAAQosMB+5SfRIxHmT7aPnEm"
+	code := buildSlab(t, 2, []Asset{{IDBase64: id, Placements: []Placement{{RawX: 0, RawY: 0, RawZ: 0, RotStep: 0}}}})
+	// Drop one character so the length is 1 (mod 4) — impossible for base64.
+	_, err := Decode(code[:len(code)-1])
+	if err == nil || !strings.Contains(err.Error(), "truncated") {
+		t.Errorf("expected a truncation error, got: %v", err)
+	}
 }
 
 // TestFullSlabDecode exercises the whole pipeline (base64 → gunzip → parse →

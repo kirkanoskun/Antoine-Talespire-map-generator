@@ -36,6 +36,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
+	"unicode"
 )
 
 // Bit layout of the 64-bit position blob (see package doc).
@@ -124,7 +126,22 @@ func encodePosition(p Placement) []byte {
 // differs. Real slabs whose asset ids talescoder already reads correctly parse
 // here too — this just fixes the coordinates.
 func Decode(slabBase64 string) (*Slab, error) {
-	compressed, err := base64.StdEncoding.DecodeString(slabBase64)
+	// Slab codes are often pasted with wrapping or stray whitespace; strip it so
+	// a clean paste works. A base64 payload's length is always a multiple of 4,
+	// so a different remainder means a character was lost or added in transit.
+	clean := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, slabBase64)
+	if len(clean) == 0 {
+		return nil, fmt.Errorf("empty slab code")
+	}
+	if len(clean)%4 != 0 {
+		return nil, fmt.Errorf("slab code looks truncated: %d base64 chars is not a multiple of 4 (a character was likely lost when copying — re-copy or attach it as a file)", len(clean))
+	}
+	compressed, err := base64.StdEncoding.DecodeString(clean)
 	if err != nil {
 		return nil, fmt.Errorf("base64: %w", err)
 	}
