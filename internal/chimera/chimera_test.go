@@ -27,7 +27,7 @@ func TestPositionRoundTrip(t *testing.T) {
 }
 
 func TestTileConversion(t *testing.T) {
-	p := decodePosition(encodePosition(Placement{RawX: 2300, RawY: 3000, RawZ: 300, RotStep: 8}))
+	p := decodePosition(encodePosition(Placement{RawX: 2300, RawY: 3000, RawZ: 600, RotStep: 8}))
 	if p.TileX != 23 || p.TileY != 30 || p.Height != 6 || p.Degrees != 120 {
 		t.Errorf("tile conversion wrong: x=%v y=%v h=%v deg=%d (want 23,30,6,120)", p.TileX, p.TileY, p.Height, p.Degrees)
 	}
@@ -144,8 +144,8 @@ func TestFullSlabDecode(t *testing.T) {
 	in := []Asset{{
 		IDBase64: id,
 		Placements: []Placement{
-			{RawX: 0, RawY: 0, RawZ: 300, RotStep: 0},
-			{RawX: 2200, RawY: 3000, RawZ: 300, RotStep: 6}, // tile (22,30)
+			{RawX: 0, RawY: 0, RawZ: 600, RotStep: 0},
+			{RawX: 2200, RawY: 3000, RawZ: 600, RotStep: 6}, // tile (22,30)
 		},
 	}}
 	code := buildSlab(t, 2, in)

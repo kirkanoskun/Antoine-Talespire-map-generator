@@ -50,16 +50,18 @@ const (
 	fieldMask = 0x3FFFF // 18 bits
 	rotMask   = 0x3FF   // 10 bits
 
-	// Game units per tile. Horizontal (X, Y) is 100, confirmed by talescoder's
-	// coherent X (raw/100 gives 0..23 for the reference building).
-	//
-	// Vertical (Z) is set so decoded height matches talescoder's — already
-	// judged coherent in the feasibility report — which fixes Y in isolation
-	// without disturbing X or Z. The exact vertical scale should still be
-	// pinned empirically (see CalibrationNote); until then Raw* carries the
-	// unconverted units so nothing is lost.
-	unitsPerTileH = 100.0
-	unitsPerTileV = 50.0
+	// unitsPerTile is the game-unit size of one tile, and it is the SAME on all
+	// three axes. Calibrated against a real community slab (the "Smiling Goat
+	// Inn", 318 assets / 5449 placements):
+	//   - Horizontal: X and Y both sit on a 100-unit lattice (2895/5449 Y values
+	//     are exact multiples of 100; X likewise, offset by a negligible 3 units
+	//     because the build itself is nudged off-grid).
+	//   - Vertical: the dominant floor-slab levels are rawZ 25, 425, 825 — a
+	//     spacing of 400 units. At 100 units/tile that is a 4-tile storey height
+	//     (standard) and a 17.4-tile-tall inn; at 50 it would be 8-tile storeys
+	//     and a 35-tile tower, which is not a plausible building.
+	// Raw{X,Y,Z} are still exposed, so any future rescale stays lossless.
+	unitsPerTile = 100.0
 )
 
 // Placement is one instance of an asset, in tile coordinates plus the raw
@@ -95,9 +97,9 @@ func decodePosition(b []byte) Placement {
 	yr := uint32((blob >> shiftY) & fieldMask)
 	rot := uint32((blob >> shiftRot) & rotMask)
 	return Placement{
-		TileX:   float64(xr) / unitsPerTileH,
-		TileY:   float64(yr) / unitsPerTileH,
-		Height:  float64(zr) / unitsPerTileV,
+		TileX:   float64(xr) / unitsPerTile,
+		TileY:   float64(yr) / unitsPerTile,
+		Height:  float64(zr) / unitsPerTile,
 		Degrees: int(rot) * 15,
 		RawX:    xr,
 		RawY:    yr,
@@ -221,8 +223,8 @@ func (c *cursor) int16() (int16, error) {
 	return int16(binary.LittleEndian.Uint16(b)), nil
 }
 
-// CalibrationNote documents the one value that still deserves an in-game check.
-const CalibrationNote = `Horizontal scale (100 units/tile) is confirmed via talescoder's X. ` +
-	`Vertical scale (50 units/tile) is chosen to match talescoder's height and ` +
-	`should be pinned by importing a tile at a known height in TaleSpire and ` +
-	`reading RawZ. RawX/RawY/RawZ are exposed so any rescale is lossless.`
+// CalibrationNote records how the scales were established.
+const CalibrationNote = `Scale is 100 units/tile on all three axes, calibrated on a real ` +
+	`community slab: X/Y sit on a 100-unit lattice, and floor slabs are 400 units apart ` +
+	`(a 4-tile storey height). Rotations decode as exactly 24 steps of 15 degrees, which ` +
+	`independently confirms the bit layout. Raw{X,Y,Z} are exposed so any rescale is lossless.`

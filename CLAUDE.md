@@ -316,11 +316,22 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **`internal/chimera`** is a standalone, tested decoder with the correct bit
   layout (round-trip + bug-reproduction + full gzip/parse tests). Nothing in the
   generator imports it. `cmd/slabdecode` vets a pasted slab code (prints axis
-  ranges). Horizontal scale (100 u/tile) is confirmed; the **vertical scale
-  (50 u/tile) still needs an in-game calibration** (import a tile at a known
-  height, read `RawZ`) before buildings are trusted — `Raw*` is exposed so any
-  rescale is lossless. Do not connect this to map generation until validated on
-  a real slab.
+  ranges).
+- **VALIDATED on a real community slab** ("Smiling Goat Inn", 318 distinct
+  assets / 5449 placements): X 0–29.93, **Y 0–37.00**, Z 0–17.39 tiles — a
+  coherent ~30×37 footprint 17 tiles tall, where talescoder gave Y up to 1009.
+  Two independent confirmations of the bit layout fell out of the same data:
+  rotations decode as **exactly 24 distinct steps of 15°** (0–345, none off the
+  step), and X/Y sit on a clean 100-unit lattice.
+- **Scale is 100 units/tile on all three axes** (uniform), calibrated from that
+  slab: floor slabs are 400 units apart, i.e. a 4-tile storey height — at the
+  previously assumed 50 u/tile it would have been 8-tile storeys and a 35-tile
+  tower, which no building looks like. `Raw{X,Y,Z}` stay exposed so any rescale
+  is lossless.
+- **Still not wired into generation.** The remaining blockers are product-level,
+  not technical: per-slab **licensing** (varies by creator; the community slab
+  used for calibration is deliberately NOT committed to this repo), and deciding
+  how a building is anchored/levelled onto generated terrain.
 
 ## Conventions
 
