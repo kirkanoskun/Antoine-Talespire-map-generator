@@ -1,0 +1,29 @@
+{
+  "map": {"width": 64, "length": 52, "name": "Bordure de foret - Smiling Goat Inn", "biome": "temperate_forest"},
+  "zones": [
+    {
+      "id": "foret_dense",
+      "anchor": {"x": 11, "y": 26},
+      "relative_size": 0.95,
+      "elevation": "flat",
+      "density_overrides": {"vegetation": 0.45, "stones": 0.05, "misc": 0.3},
+      "description": "futaie dense a l'ouest"
+    },
+    {
+      "id": "lisiere",
+      "anchor": {"x": 27, "y": 26},
+      "relative_size": 0.4,
+      "elevation": "flat",
+      "density_overrides": {"vegetation": 0.16, "stones": 0.04, "misc": 0.22},
+      "description": "arbres clairsemes, transition vers le pre"
+    },
+    {
+      "id": "pre_de_l_auberge",
+      "anchor": {"x": 47, "y": 26},
+      "relative_size": 0.8,
+      "elevation": "flat",
+      "density_overrides": {"vegetation": 0.015, "stones": 0.01, "misc": 0.07},
+      "description": "pre ouvert et plat ou s'installe l'auberge"
+    }
+  ]
+}

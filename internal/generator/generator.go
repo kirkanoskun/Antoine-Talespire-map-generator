@@ -608,17 +608,26 @@ func distributionFor(pb *taleslabentities.PropBlocks, e elementtype.ElementType)
 // output identical whether or not slicing is enabled).
 func buildAsset(p *placement, originX, originY int) *taleslabentities.Asset {
 	part := p.part
+	x := p.tileX - originX
+	y := p.tileY - originY
 	return &taleslabentities.Asset{
 		ID:         part.ID,
 		Name:       part.Name,
 		Dimensions: part.Dimensions,
 		OffsetZ:    part.OffsetZ,
-		Coordinates: &taleslabentities.Vector3d{
-			X: (p.tileX - originX) * part.Dimensions.Width,
-			Y: (p.tileY - originY) * part.Dimensions.Length,
-			Z: p.z * part.Dimensions.Height,
-		},
-		Rotation: p.baseRotation + (p.tileY * part.Dimensions.Length / 41),
+		// A coordinate is a grid position, NOT a position scaled by the asset's
+		// size. taleslab multiplies each axis by the asset's dimensions here,
+		// which is a no-op for the 1x1x1 assets it happens to use but displaces
+		// anything larger: a width-2 bush lands at twice its X, and a height-2
+		// wall (big_stone_wall, used by the ruins relief) floats at twice its
+		// height. We store the position itself.
+		Coordinates: &taleslabentities.Vector3d{X: x, Y: y, Z: p.z},
+		// Overflow compensation, and the reason taleslab's odd "/41" term exists:
+		// the encoder packs Y as y*1600 into a uint16, which wraps every 41 tiles
+		// (41*1600 > 65535). Each wrap drops 65536 from that field — 4096 once
+		// shifted into the packed Y — and because the rotation word's low bits
+		// overlap Y's high bits, adding 1 per wrap puts exactly that back.
+		Rotation: p.baseRotation + y/41,
 	}
 }
 

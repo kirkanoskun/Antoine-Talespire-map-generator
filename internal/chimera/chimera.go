@@ -50,18 +50,22 @@ const (
 	fieldMask = 0x3FFFF // 18 bits
 	rotMask   = 0x3FF   // 10 bits
 
-	// unitsPerTile is the game-unit size of one tile, and it is the SAME on all
-	// three axes. Calibrated against a real community slab (the "Smiling Goat
-	// Inn", 318 assets / 5449 placements):
-	//   - Horizontal: X and Y both sit on a 100-unit lattice (2895/5449 Y values
-	//     are exact multiples of 100; X likewise, offset by a negligible 3 units
-	//     because the build itself is nudged off-grid).
-	//   - Vertical: the dominant floor-slab levels are rawZ 25, 425, 825 — a
-	//     spacing of 400 units. At 100 units/tile that is a 4-tile storey height
-	//     (standard) and a 17.4-tile-tall inn; at 50 it would be 8-tile storeys
-	//     and a 35-tile tower, which is not a plausible building.
-	// Raw{X,Y,Z} are still exposed, so any future rescale stays lossless.
-	unitsPerTile = 100.0
+	// Game units per grid step. The vertical step is HALF the horizontal one.
+	//
+	// Horizontal (100 u/tile) is confirmed twice over: a real community slab has
+	// X/Y on a clean 100-unit lattice, and this project's own generator emits
+	// rawX/rawY of 0,100,...,500 for a 6-tile map.
+	//
+	// Vertical (50 u/step) is confirmed by round-tripping the generator's own
+	// output: a map at height 1 encodes to rawZ=50. taleslab/talescoder have
+	// always used this step and produce slabs the game accepts, so it is the
+	// unit to interoperate in. It is also consistent with the community slab,
+	// whose floor slabs are 400 units apart — 8 vertical steps, i.e. the usual
+	// 4-tile-equivalent ceiling height, since a step is half a tile.
+	//
+	// Raw{X,Y,Z} are exposed so any rescale stays lossless.
+	unitsPerTileH = 100.0
+	unitsPerStepV = 50.0
 )
 
 // Placement is one instance of an asset, in tile coordinates plus the raw
@@ -85,9 +89,13 @@ type Asset struct {
 
 // Slab is the decoded slab.
 type Slab struct {
-	Version int16   `json:"version"`
-	Assets  []Asset `json:"assets"`
+	Version    int16   `json:"version"`
+	MagicBytes []byte  `json:"-"` // preserved so Encode round-trips exactly
+	Assets     []Asset `json:"assets"`
 }
+
+// DefaultMagicBytes is TaleSpire's slab header signature.
+var DefaultMagicBytes = []byte{206, 250, 206, 209}
 
 // decodePosition unpacks one 8-byte little-endian position blob.
 func decodePosition(b []byte) Placement {
@@ -97,9 +105,9 @@ func decodePosition(b []byte) Placement {
 	yr := uint32((blob >> shiftY) & fieldMask)
 	rot := uint32((blob >> shiftRot) & rotMask)
 	return Placement{
-		TileX:   float64(xr) / unitsPerTile,
-		TileY:   float64(yr) / unitsPerTile,
-		Height:  float64(zr) / unitsPerTile,
+		TileX:   float64(xr) / unitsPerTileH,
+		TileY:   float64(yr) / unitsPerTileH,
+		Height:  float64(zr) / unitsPerStepV,
 		Degrees: int(rot) * 15,
 		RawX:    xr,
 		RawY:    yr,
@@ -157,7 +165,8 @@ func Decode(slabBase64 string) (*Slab, error) {
 	}
 
 	c := &cursor{buf: raw}
-	if _, err := c.bytes(4); err != nil { // magic bytes
+	magic, err := c.bytes(4)
+	if err != nil {
 		return nil, err
 	}
 	version, err := c.int16()
@@ -169,7 +178,7 @@ func Decode(slabBase64 string) (*Slab, error) {
 		return nil, err
 	}
 
-	slab := &Slab{Version: version}
+	slab := &Slab{Version: version, MagicBytes: append([]byte(nil), magic...)}
 	counts := make([]int16, assetCount)
 	for i := int16(0); i < assetCount; i++ {
 		id, err := c.bytes(18)
@@ -224,7 +233,65 @@ func (c *cursor) int16() (int16, error) {
 }
 
 // CalibrationNote records how the scales were established.
-const CalibrationNote = `Scale is 100 units/tile on all three axes, calibrated on a real ` +
-	`community slab: X/Y sit on a 100-unit lattice, and floor slabs are 400 units apart ` +
-	`(a 4-tile storey height). Rotations decode as exactly 24 steps of 15 degrees, which ` +
-	`independently confirms the bit layout. Raw{X,Y,Z} are exposed so any rescale is lossless.`
+const CalibrationNote = `Horizontal is 100 units/tile, vertical is 50 units/step (half a tile). ` +
+	`Both were confirmed by round-tripping this project's own generator output, and are ` +
+	`consistent with a real community slab. Rotations decode as exactly 24 steps of 15 degrees, ` +
+	`which independently confirms the bit layout. Raw{X,Y,Z} are exposed so any rescale is lossless.`
+
+// Encode writes a Slab back to a base64 TaleSpire slab code, using the correct
+// bit layout. It is the exact inverse of Decode, so decode->encode of a real
+// slab reproduces it byte for byte.
+//
+// Assets are written in slice order and placements in their listed order, so
+// output is deterministic for a given Slab.
+func Encode(s *Slab) (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("nil slab")
+	}
+	magic := s.MagicBytes
+	if len(magic) != 4 {
+		magic = DefaultMagicBytes
+	}
+	version := s.Version
+	if version == 0 {
+		version = 2
+	}
+
+	var buf bytes.Buffer
+	buf.Write(magic)
+	putI16(&buf, version)
+	putI16(&buf, int16(len(s.Assets)))
+	for _, a := range s.Assets {
+		id, err := base64.StdEncoding.DecodeString(a.IDBase64)
+		if err != nil {
+			return "", fmt.Errorf("asset id %q: %w", a.IDBase64, err)
+		}
+		if len(id) != 18 {
+			return "", fmt.Errorf("asset id %q decodes to %d bytes, want 18", a.IDBase64, len(id))
+		}
+		buf.Write(id)
+		putI16(&buf, int16(len(a.Placements)))
+	}
+	putI16(&buf, 0) // separator before the layout blobs
+	for _, a := range s.Assets {
+		for _, p := range a.Placements {
+			buf.Write(encodePosition(p))
+		}
+	}
+
+	var gz bytes.Buffer
+	w, _ := gzip.NewWriterLevel(&gz, gzip.BestCompression)
+	if _, err := w.Write(buf.Bytes()); err != nil {
+		return "", err
+	}
+	if err := w.Close(); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(gz.Bytes()), nil
+}
+
+func putI16(buf *bytes.Buffer, v int16) {
+	var b [2]byte
+	binary.LittleEndian.PutUint16(b[:], uint16(v))
+	buf.Write(b[:])
+}
