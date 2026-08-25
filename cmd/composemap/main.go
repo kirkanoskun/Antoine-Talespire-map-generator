@@ -10,9 +10,12 @@
 //	    -building inn.txt -at 30,7 -out out/map.txt -preview out/map.png
 //
 // Vertical placement: the generator stacks ground so a tile's top block sits at
-// height h, and props rest at h+1. The building is therefore translated so its
-// lowest element lands on h+1, where h is the highest terrain under its
-// footprint (using the highest point means the building is never half-buried).
+// height h, and props rest at h+1. The building is seated by aligning its GROUND
+// level with h+1 — not its lowest piece, because a build often carries a cellar
+// or foundations that are meant to end up below the surface. Use
+// `slabdecode -levels` to find that level and pass it as -building-ground;
+// without it the busiest level is assumed. Since TaleSpire has no negative Z,
+// the whole scene is raised if the buried part would otherwise go below zero.
 package main
 
 import (
@@ -47,6 +50,7 @@ func main() {
 	outPath := flag.String("out", "", "write the combined TaleSpire code here")
 	previewPath := flag.String("preview", "", "write a 2D preview PNG here")
 	keepProps := flag.Bool("keep-props", false, "keep generated props inside the building footprint")
+	buildingGround := flag.Int("building-ground", -1, "rawZ inside the building that is its ground level (see `slabdecode -levels`); -1 auto-detects the busiest level")
 	sliceSize := flag.Int("slice", 0, "also write the map cut into slabs of at most N tiles per side (0 = single slab)")
 	flag.Parse()
 
@@ -112,12 +116,37 @@ func main() {
 		log.Printf("note: terrain under the footprint is not level (heights %d..%d); "+
 			"seating the building on the highest point so nothing is buried", loH, hiH)
 	}
-	baseStep := hiH + 1 // props rest one step above the top ground block
+	baseStep := hiH + 1 // where props (and the building's ground floor) rest
 
-	// --- 4. translate the building into place --------------------------------
+	// --- 4. seat the building on the terrain ---------------------------------
+	// Align the building's GROUND level with the terrain surface — not its
+	// lowest piece. A build often includes a cellar or foundations below ground
+	// level; anchoring the lowest piece would shove the whole thing up into the
+	// air and leave what should be buried sitting on the surface.
+	groundZ := uint32(*buildingGround)
+	if *buildingGround < 0 {
+		groundZ = busiestLevel(building)
+		fmt.Printf("building ground level: auto-detected rawZ %d (step %.1f) — the busiest level\n",
+			groundZ, float64(groundZ)/unitsPerStep)
+	}
+	if groundZ < minZ {
+		log.Fatalf("-building-ground %d is below the building's lowest piece (%d)", groundZ, minZ)
+	}
+	buried := int(groundZ) - int(minZ) // how far the build extends below its ground level
+
 	dx := int(ax*unitsPerTile) - int(minX)
 	dy := int(ay*unitsPerTile) - int(minY)
-	dz := baseStep*unitsPerStep - int(minZ)
+	dz := baseStep*unitsPerStep - int(groundZ)
+
+	// TaleSpire has no negative Z, so if the buried part would go below zero we
+	// raise the whole composition — map included — by just enough. Relative
+	// geometry is untouched; the scene simply sits higher above the world floor.
+	lift := 0
+	if low := int(minZ) + dz; low < 0 {
+		lift = -low
+	}
+	dz += lift
+
 	for ai := range building.Assets {
 		for pi := range building.Assets[ai].Placements {
 			p := &building.Assets[ai].Placements[pi]
@@ -126,21 +155,45 @@ func main() {
 			p.RawZ = uint32(int(p.RawZ) + dz)
 		}
 	}
+	if lift > 0 {
+		for ai := range mapSlab.Assets {
+			for pi := range mapSlab.Assets[ai].Placements {
+				p := &mapSlab.Assets[ai].Placements[pi]
+				p.RawZ = uint32(int(p.RawZ) + lift)
+			}
+		}
+	}
 
-	// --- 5. clear generated props under the building --------------------------
-	// Ground blocks fill up to h (rawZ <= h*unitsPerStep); props sit above. So
-	// dropping anything higher than the ground inside the footprint removes the
-	// scatter (trees, rocks) without touching the terrain itself.
-	removed := 0
+	// --- 5. clear the terrain the building occupies --------------------------
+	// Two different jobs per tile of the footprint:
+	//   - where the build digs in (it has something at or below the surface),
+	//     drop the map's ground too, so the cellar is not encased in terrain;
+	//   - elsewhere, drop only the scatter (trees, rocks) standing above ground.
+	digs := map[[2]int]bool{}
+	for _, a := range building.Assets {
+		for _, p := range a.Placements {
+			tx, ty := int(p.RawX)/unitsPerTile, int(p.RawY)/unitsPerTile
+			h := res.Height.HeightAt(clamp(tx, 0, doc.Map.Width-1), clamp(ty, 0, doc.Map.Length-1))
+			if int(p.RawZ) <= h*unitsPerStep+lift {
+				digs[[2]int{tx, ty}] = true
+			}
+		}
+	}
+	removedProps, removedGround := 0, 0
 	if !*keepProps {
 		for ai := range mapSlab.Assets {
 			kept := mapSlab.Assets[ai].Placements[:0]
 			for _, p := range mapSlab.Assets[ai].Placements {
 				tx, ty := int(p.RawX)/unitsPerTile, int(p.RawY)/unitsPerTile
-				inside := tx >= ax && tx <= ax+wTiles && ty >= ay && ty <= ay+lTiles
-				if inside {
-					if h := res.Height.HeightAt(clamp(tx, 0, doc.Map.Width-1), clamp(ty, 0, doc.Map.Length-1)); int(p.RawZ) > h*unitsPerStep {
-						removed++
+				if tx >= ax && tx <= ax+wTiles && ty >= ay && ty <= ay+lTiles {
+					h := res.Height.HeightAt(clamp(tx, 0, doc.Map.Width-1), clamp(ty, 0, doc.Map.Length-1))
+					surface := h*unitsPerStep + lift
+					if digs[[2]int{tx, ty}] {
+						removedGround++
+						continue // the build supplies its own floor here
+					}
+					if int(p.RawZ) > surface {
+						removedProps++
 						continue
 					}
 				}
@@ -149,6 +202,7 @@ func main() {
 			mapSlab.Assets[ai].Placements = kept
 		}
 	}
+	removed := removedProps + removedGround
 
 	// --- 6. merge and encode --------------------------------------------------
 	combined := merge(mapSlab, building)
@@ -164,9 +218,15 @@ func main() {
 	fmt.Printf("map:      %dx%d, %d zones\n", doc.Map.Width, doc.Map.Length, len(doc.Zones))
 	fmt.Printf("building: %d assets, %d placements, footprint %dx%d tiles\n",
 		len(building.Assets), countPlacements(building), wTiles, lTiles)
-	fmt.Printf("placed at tile (%d,%d), terrain height %d, building base step %d\n", ax, ay, hiH, baseStep)
+	fmt.Printf("placed at tile (%d,%d): terrain height %d, ground level seated on step %d\n", ax, ay, hiH, baseStep)
+	if buried > 0 {
+		fmt.Printf("buried below ground: %d units (%.1f steps) of cellar/foundations\n", buried, float64(buried)/unitsPerStep)
+	}
+	if lift > 0 {
+		fmt.Printf("raised the whole scene by %d units (%.1f steps) to keep the buried part at Z >= 0\n", lift, float64(lift)/unitsPerStep)
+	}
 	if removed > 0 {
-		fmt.Printf("cleared %d generated props inside the footprint\n", removed)
+		fmt.Printf("cleared %d generated pieces in the footprint (%d props, %d ground where the build digs in)\n", removed, removedProps, removedGround)
 	}
 	fmt.Printf("combined: %d distinct assets, %d placements\n", len(combined.Assets), total)
 	fmt.Printf("code size: %d chars\n", len(code))
@@ -376,4 +436,22 @@ func appendPlacement(s *chimera.Slab, id string, p chimera.Placement) {
 		}
 	}
 	s.Assets = append(s.Assets, chimera.Asset{IDBase64: id, Placements: []chimera.Placement{p}})
+}
+
+// busiestLevel returns the rawZ carrying the most pieces. For a building that
+// is almost always the ground floor, which is the level to seat on the terrain.
+func busiestLevel(s *chimera.Slab) uint32 {
+	count := map[uint32]int{}
+	for _, a := range s.Assets {
+		for _, p := range a.Placements {
+			count[p.RawZ]++
+		}
+	}
+	best, bestZ := -1, uint32(0)
+	for z, n := range count {
+		if n > best || (n == best && z < bestZ) {
+			best, bestZ = n, z
+		}
+	}
+	return bestZ
 }
