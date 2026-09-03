@@ -295,3 +295,75 @@ func putI16(buf *bytes.Buffer, v int16) {
 	binary.LittleEndian.PutUint16(b[:], uint16(v))
 	buf.Write(b[:])
 }
+
+// Bounds is a slab's extent in raw game units, plus how many pieces it holds.
+type Bounds struct {
+	MinX, MaxX uint32
+	MinY, MaxY uint32
+	MinZ, MaxZ uint32
+	Placements int
+}
+
+// WidthTiles and LengthTiles are the footprint, rounded up to whole tiles.
+func (b Bounds) WidthTiles() int  { return int((b.MaxX-b.MinX)+unitsPerTileH-1) / unitsPerTileH }
+func (b Bounds) LengthTiles() int { return int((b.MaxY-b.MinY)+unitsPerTileH-1) / unitsPerTileH }
+
+// HeightSteps is the vertical extent in height steps.
+func (b Bounds) HeightSteps() float64 { return float64(b.MaxZ-b.MinZ) / unitsPerStepV }
+
+// Bounds measures the slab. An empty slab yields the zero value.
+func (s *Slab) Bounds() Bounds {
+	var b Bounds
+	first := true
+	for _, a := range s.Assets {
+		for _, p := range a.Placements {
+			b.Placements++
+			if first {
+				b.MinX, b.MaxX = p.RawX, p.RawX
+				b.MinY, b.MaxY = p.RawY, p.RawY
+				b.MinZ, b.MaxZ = p.RawZ, p.RawZ
+				first = false
+				continue
+			}
+			b.MinX, b.MaxX = minU32(b.MinX, p.RawX), maxU32(b.MaxX, p.RawX)
+			b.MinY, b.MaxY = minU32(b.MinY, p.RawY), maxU32(b.MaxY, p.RawY)
+			b.MinZ, b.MaxZ = minU32(b.MinZ, p.RawZ), maxU32(b.MaxZ, p.RawZ)
+		}
+	}
+	return b
+}
+
+// BusiestLevel returns the rawZ carrying the most pieces, ties broken by the
+// lower level. For a building that is almost always its ground floor, which is
+// the level to line up with the terrain — anything below it (a cellar, footings)
+// is meant to end up buried. Verify with `slabdecode -levels` before trusting it
+// on an unusual build.
+func (s *Slab) BusiestLevel() uint32 {
+	count := map[uint32]int{}
+	for _, a := range s.Assets {
+		for _, p := range a.Placements {
+			count[p.RawZ]++
+		}
+	}
+	best, bestZ := -1, uint32(0)
+	for z, n := range count {
+		if n > best || (n == best && z < bestZ) {
+			best, bestZ = n, z
+		}
+	}
+	return bestZ
+}
+
+func minU32(a, b uint32) uint32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxU32(a, b uint32) uint32 {
+	if a > b {
+		return a
+	}
+	return b
+}

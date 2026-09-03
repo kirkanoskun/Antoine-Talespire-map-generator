@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/buildings"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/chimera"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
@@ -41,7 +42,7 @@ const (
 
 func main() {
 	irPath := flag.String("ir", "", "IR JSON describing the map (required)")
-	buildPath := flag.String("building", "", "file holding the building's base64 slab code (required)")
+	buildPath := flag.String("building", "", "library id (see `buildings list`) or a file holding a base64 slab code (required)")
 	at := flag.String("at", "0,0", "tile position for the building's north-west corner: x,y")
 	biomes := flag.String("biomes", "configs/biomes.json", "biome catalogue")
 	props := flag.String("props", "configs/props.json", "prop catalogue")
@@ -50,6 +51,7 @@ func main() {
 	outPath := flag.String("out", "", "write the combined TaleSpire code here")
 	previewPath := flag.String("preview", "", "write a 2D preview PNG here")
 	keepProps := flag.Bool("keep-props", false, "keep generated props inside the building footprint")
+	libraryDir := flag.String("library", defaultLibraryDir(), "building library directory")
 	buildingGround := flag.Int("building-ground", -1, "rawZ inside the building that is its ground level (see `slabdecode -levels`); -1 auto-detects the busiest level")
 	sliceSize := flag.Int("slice", 0, "also write the map cut into slabs of at most N tiles per side (0 = single slab)")
 	flag.Parse()
@@ -92,12 +94,15 @@ func main() {
 		log.Fatalf("decoding generated map: %v", err)
 	}
 
-	// --- 2. decode the building ---------------------------------------------
-	bcode, err := os.ReadFile(*buildPath)
+	// --- 2. resolve and decode the building ----------------------------------
+	// -building takes a library id or a path to a slab code. Coming from the
+	// library also brings its recorded ground level, so a building filed once is
+	// seated correctly ever after without repeating -building-ground.
+	buildingCode, libGround, err := resolveBuilding(*buildPath, *libraryDir)
 	if err != nil {
-		log.Fatalf("reading building: %v", err)
+		log.Fatal(err)
 	}
-	building, err := chimera.Decode(strings.TrimSpace(string(bcode)))
+	building, err := chimera.Decode(buildingCode)
 	if err != nil {
 		log.Fatalf("decoding building: %v", err)
 	}
@@ -123,9 +128,16 @@ func main() {
 	// lowest piece. A build often includes a cellar or foundations below ground
 	// level; anchoring the lowest piece would shove the whole thing up into the
 	// air and leave what should be buried sitting on the surface.
-	groundZ := uint32(*buildingGround)
-	if *buildingGround < 0 {
-		groundZ = busiestLevel(building)
+	var groundZ uint32
+	switch {
+	case *buildingGround >= 0:
+		groundZ = uint32(*buildingGround)
+	case libGround != nil:
+		groundZ = *libGround
+		fmt.Printf("building ground level: rawZ %d (step %.1f) — from the library\n",
+			groundZ, float64(groundZ)/unitsPerStep)
+	default:
+		groundZ = building.BusiestLevel()
 		fmt.Printf("building ground level: auto-detected rawZ %d (step %.1f) — the busiest level\n",
 			groundZ, float64(groundZ)/unitsPerStep)
 	}
@@ -438,20 +450,46 @@ func appendPlacement(s *chimera.Slab, id string, p chimera.Placement) {
 	s.Assets = append(s.Assets, chimera.Asset{IDBase64: id, Placements: []chimera.Placement{p}})
 }
 
-// busiestLevel returns the rawZ carrying the most pieces. For a building that
-// is almost always the ground floor, which is the level to seat on the terrain.
-func busiestLevel(s *chimera.Slab) uint32 {
-	count := map[uint32]int{}
-	for _, a := range s.Assets {
-		for _, p := range a.Placements {
-			count[p.RawZ]++
-		}
+func defaultLibraryDir() string {
+	if d := os.Getenv("TALESPIRE_BUILDINGS"); d != "" {
+		return d
 	}
-	best, bestZ := -1, uint32(0)
-	for z, n := range count {
-		if n > best || (n == best && z < bestZ) {
-			best, bestZ = n, z
-		}
+	return "buildings"
+}
+
+// resolveBuilding accepts either a library id or a path to a slab code. A
+// library entry also supplies the ground level recorded when it was filed.
+func resolveBuilding(ref, libDir string) (code string, groundZ *uint32, err error) {
+	if ref == "" {
+		return "", nil, fmt.Errorf("-building is required (a library id or a file path)")
 	}
-	return bestZ
+	// A real file wins, so existing scripts passing paths keep working.
+	if raw, ferr := os.ReadFile(ref); ferr == nil {
+		return strings.TrimSpace(string(raw)), nil, nil
+	}
+	lib, lerr := buildings.Open(libDir)
+	if lerr != nil {
+		return "", nil, fmt.Errorf("%q is not a file and the library could not be opened: %w", ref, lerr)
+	}
+	e, gerr := lib.Get(ref)
+	if gerr != nil {
+		return "", nil, fmt.Errorf("%q is neither a file nor a library id: %w", ref, gerr)
+	}
+	code, cerr := lib.Code(e)
+	if cerr != nil {
+		return "", nil, cerr
+	}
+	fmt.Printf("building: %q from the library (%s)\n", e.Name, e.ID)
+	if e.License != "" || e.Author != "" {
+		fmt.Printf("  by %s — %s\n", orDash(e.Author), orDash(e.License))
+	}
+	g := e.GroundZ
+	return code, &g, nil
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "unknown"
+	}
+	return s
 }
