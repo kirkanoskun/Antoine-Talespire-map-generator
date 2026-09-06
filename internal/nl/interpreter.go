@@ -166,6 +166,15 @@ func (in *Interpreter) validate(raw string, opts Options) (*ir.IR, error) {
 				z.ID, z.ReliefOverride, doc.Map.Biome, strings.Join(in.catalog.Biomes[doc.Map.Biome], ", "))
 		}
 	}
+ for _, placement := range doc.Buildings {
+  building, ok := in.catalog.Prefabs.Get(placement.Prefab)
+  if !ok { return nil, fmt.Errorf("unknown building prefab %q", placement.Prefab) }
+  w, l := building.Info.Width, building.Info.Length
+  if placement.Rotation == 90 || placement.Rotation == 270 { w, l = l, w }
+  if placement.Position.X+w > doc.Map.Width || placement.Position.Y+l > doc.Map.Length {
+   return nil, fmt.Errorf("building %q footprint is outside the map", placement.Prefab)
+  }
+ }
 	return doc, nil
 }
 

@@ -123,11 +123,20 @@ type Connection struct {
 	Width int    `json:"width"`
 }
 
+// BuildingPlacement places an imported prefab. Position is the north-west
+// corner of its reserved rectangle, in map tiles. Rotation is a game yaw in degrees.
+type BuildingPlacement struct {
+ Prefab string `json:"prefab"`
+ Position *Anchor `json:"position"`
+ Rotation int `json:"rotation,omitempty"`
+}
+
 // IR is the full intermediate representation of a map.
 type IR struct {
 	Map         Map          `json:"map"`
 	Zones       []Zone       `json:"zones"`
 	Connections []Connection `json:"connections,omitempty"`
+ Buildings []BuildingPlacement `json:"buildings,omitempty"`
 }
 
 // Parse decodes and validates an IR document.

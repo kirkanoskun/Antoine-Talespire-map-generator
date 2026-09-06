@@ -287,3 +287,16 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   output path.
 - Validate the IR at the boundary (`ir.Parse`) — fail loudly, never panic deep
   in generation.
+
+### Community prefab import
+
+`internal/slab` implements the Bouncy Rock documented v2 packed binary format,
+keeping hundredth-unit coordinates, per-asset rotations and extra bits.
+`internal/prefab` validates and persists portable entries. `cmd/import-slab`
+adds a code to `configs/prefabs.json`, which is embedded in new builds.
+The server also keeps user imports in `~/.talespire/prefabs.json`.
+`buildings` is a top-level IR array of `{prefab, position:{x,y}, rotation}`;
+position is the north-west corner of the reserved footprint. Only catalogue IDs
+are permitted. No base64 goes into model instructions. Unknown IDs, overlapping
+footprints, water and out-of-map placements fail explicitly. See
+`docs/slab-importer.md` for the conversation workflow and physical bounds limits.

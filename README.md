@@ -208,3 +208,12 @@ testdata/             example IR documents + NL descriptions
 ## License
 
 Inherits the terms of the upstream taleslab project for reused assets/config.
+
+### Bâtiments importés (Slabs v2)
+
+Collez un code dans **Bâtiments importés**, ou utilisez
+`go run ./cmd/import-slab -input maison.txt -id maison_pierre -name 'Maison en pierre'`.
+Le catalogue est inclus dans les prompts et l'IR peut placer ces bâtiments avec
+`buildings`. Les imports locaux persistent entre les lancements ; ceux ajoutés à
+`configs/prefabs.json` sont embarqués à la prochaine compilation.
+Voir [le guide d'import et le parcours depuis une conversation](docs/slab-importer.md).
