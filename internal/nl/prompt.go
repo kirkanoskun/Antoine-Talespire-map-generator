@@ -6,14 +6,39 @@ import (
 	"strings"
 )
 
+// PromptVersion identifies the wording of the generated IR prompt. Bump it when
+// the instruction text changes so users can tell which revision they pasted.
+const PromptVersion = "1.03"
+
+// clarifyingQuestions is the interactive preamble used only by the keyless
+// "generate a prompt" flow (BuildPrompt), where the user has a real back-and-forth
+// with their own AI. The automated API path (Interpret) never includes it — it is
+// a single-shot call that must return JSON immediately for the validate loop.
+const clarifyingQuestions = `
+# Before anything else: ask 3 clarifying questions
+The user's initial description is often short. Before producing any JSON, ask exactly three short clarifying questions, in the same language as the description (usually French), to refine the scene. Cover these three angles, adapted to what the description leaves open:
+1. Density and mood: dense and wild, or open and calm? Any particular atmosphere (bright, eerie, mysterious)?
+2. Focal point: is there one element that should clearly stand out (an altar, a campfire, a specific ruin), and roughly where?
+3. Circulation: should the zones be linked by a visible path, or is a more organic layout without a marked path preferred?
+Ask them together, briefly, in a single message. Wait for the user's answer before continuing. If the user says to skip the questions or just go ahead, proceed straight to the JSON using your best judgment on these three points.
+`
+
 // systemPrompt builds the instruction prompt from the catalog. It is stable for
 // a given catalog (no timestamps, deterministic ordering) so it can be prompt-
-// cached across the retry turns and across descriptions.
-func (c *Catalog) systemPrompt() string {
+// cached across the retry turns and across descriptions. When interactive is
+// true it prepends the clarifying-questions preamble and relaxes the output
+// contract accordingly (used by the keyless BuildPrompt flow only).
+func (c *Catalog) systemPrompt(interactive bool) string {
 	var b strings.Builder
 
 	b.WriteString(`You are a level designer for TaleSpire maps. You translate a scene description (usually in French) into a single JSON document called the IR (intermediate representation). You never draw tiles; you reason about zones, relief, density and points of interest.
+`)
 
+	if interactive {
+		b.WriteString(clarifyingQuestions)
+	}
+
+	b.WriteString(`
 # Absolute rule: one biome per map
 A map has ONE dominant biome, chosen once for the whole map, for coherence. Zones NEVER change the biome. Within the single biome a zone only modulates:
 - prop density (density_overrides),
@@ -70,9 +95,15 @@ Notes:
 	b.WriteString(strings.Join(c.POINames, ", "))
 	b.WriteString("\n")
 
-	b.WriteString(`
+	if interactive {
+		b.WriteString(`
+# Output contract
+Once the user has answered the three clarifying questions (or has told you to skip them / to go ahead), return ONLY the JSON document — no markdown, no code fences, no commentary before or after. It must parse as a single JSON object and satisfy every constraint above. Until then, ask the three clarifying questions and wait — do not output any JSON yet.`)
+	} else {
+		b.WriteString(`
 # Output contract
 Return ONLY the JSON document. No markdown, no code fences, no commentary before or after. It must parse as a single JSON object and satisfy every constraint above.`)
+	}
 
 	return b.String()
 }
@@ -105,7 +136,8 @@ func (c *Catalog) BuildPrompt(description string, opts Options) string {
 		opts.Length = 50
 	}
 	var b strings.Builder
-	b.WriteString(c.systemPrompt())
+	fmt.Fprintf(&b, "TaleSpire IR prompt — version %s\n\n", PromptVersion)
+	b.WriteString(c.systemPrompt(true))
 	b.WriteString("\n\n=====\n\n")
 	b.WriteString(userPrompt(description, opts.Width, opts.Length, opts.Name, opts.ForcedBiome))
 	return b.String()
