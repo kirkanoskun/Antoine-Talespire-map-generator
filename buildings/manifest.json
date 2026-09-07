@@ -1,0 +1,25 @@
+[
+  {
+    "id": "smiling-goat-inn",
+    "name": "Smiling Goat Inn",
+    "file": "smiling-goat-inn.slab",
+    "tags": [
+      "inn",
+      "tavern",
+      "two-storey",
+      "village"
+    ],
+    "description": "Auberge a colombages avec cour, palissade et cave",
+    "source": "https://talestavern.com/",
+    "license": "verifier sur la page Tales Tavern",
+    "ground_z": 425,
+    "width_tiles": 30,
+    "length_tiles": 37,
+    "height_steps": 34.78,
+    "buried_steps": 8.5,
+    "assets": 318,
+    "placements": 5449,
+    "code_chars": 39048,
+    "added_at": "2026-09-03T16:27:14Z"
+  }
+]

@@ -140,11 +140,6 @@ internal/generator/   zone-aware slab generation, stitching, paths, mapper
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry, Adjust
 internal/server/      HTTP API + embedded single-page UI, in-memory sessions
-internal/chimera/     correct decoder/encoder for community "Chimera" slabs
-internal/buildings/   on-disk library of reusable buildings (manifest + slabs)
-cmd/slabdecode/       vet a slab code; -levels lists its horizontal levels
-cmd/buildings/        add/list/show/remove buildings in the library
-cmd/composemap/       generate a map and place a library building on it
 configs/              biomes.json, props.json (copied from taleslab)
 testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
@@ -304,59 +299,49 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - TaleSpire's max slab size — RESOLVED: ~30 kB per slab, slicing implemented.
   The one remaining unautomatable step is importing a code into a real client.
 
-### Community slab import (exploration, NOT wired in)
+### Community slab import — findings, not code
 
-- **Goal.** Import real player-made buildings (Tales Tavern / TalesBazaar,
-  "Chimera" format) and drop them into generated maps, chosen from the prompt.
-  The realistic path is a hand-curated, decoded-once library, not live scraping
-  (both sites need a human click to copy a slab code).
-- **Blocker fixed: the Y axis.** `talescoder` v1.0.5 (latest) decodes a real
-  slab's horizontal-depth (Y) axis wrongly. TaleSpire packs each placement as a
-  64-bit little-endian blob with 18-bit fields (X@0, Z@18, Y@36, rot@54, rot in
-  15° steps); talescoder reads byte-aligned 16-bit fields, so Y is 4 bits off and
-  its high bits leak into "rotation". It is only accidentally right for
-  grid-snapped tiles (rawY a multiple of 100), which is why a building's floor
-  decoded fine but its offset/rotated pieces ran to impossible Y (0..1009).
-  Confirmed against LuPro/SlabelFish (the reference Chimera implementation).
-- **`internal/chimera`** is a standalone, tested decoder with the correct bit
-  layout (round-trip + bug-reproduction + full gzip/parse tests). Nothing in the
-  generator imports it. `cmd/slabdecode` vets a pasted slab code (prints axis
-  ranges).
+Importing real player-made buildings (Tales Tavern / TalesBazaar) is implemented
+on the `codex/slab-importer` branch (`internal/slab`, `internal/prefab`,
+`cmd/import-slab`). A parallel exploration lived here (`internal/chimera`,
+`internal/buildings`, `cmd/composemap`, `cmd/slabdecode`) and was removed to
+avoid two implementations of the same thing. What that exploration *established*
+is kept below, because it was paid for in in-game trial and error and the
+surviving implementation still needs some of it.
+
+- **The packed position layout.** TaleSpire packs each placement as a 64-bit
+  little-endian blob with 18-bit fields: horizontal-A @0, vertical @18,
+  horizontal-B @36, then rotation in 15° steps @54. `talescoder` v1.0.5 (latest)
+  reads byte-aligned 16-bit fields instead, so one horizontal axis is 4 bits off
+  and its high bits leak into "rotation". It is only accidentally right for
+  grid-snapped tiles, which is why a community building's floor decoded fine but
+  its offset pieces ran to impossible coordinates (0..1009 tiles). Confirmed
+  against LuPro/SlabelFish and against Bouncy Rock's own `format.md`.
 - **VALIDATED on a real community slab** ("Smiling Goat Inn", 318 distinct
-  assets / 5449 placements): X 0–29.93, **Y 0–37.00**, Z 0–17.39 tiles — a
-  coherent ~30×37 footprint 17 tiles tall, where talescoder gave Y up to 1009.
-  Two independent confirmations of the bit layout fell out of the same data:
-  rotations decode as **exactly 24 distinct steps of 15°** (0–345, none off the
-  step), and X/Y sit on a clean 100-unit lattice.
+  assets / 5449 placements): a coherent ~30×37 footprint 17 tiles tall where
+  talescoder gave 1009. Two independent confirmations fell out of the same data:
+  rotations decode as exactly 24 distinct steps of 15° (none off the step), and
+  the horizontal axes sit on a clean 100-unit lattice.
 - **Scale: 100 units per tile horizontally, 50 per step vertically** (a vertical
-  step is half a tile). Both were settled by round-tripping the generator's own
-  output — a map at height 1 encodes to `rawZ=50`, and a 6-tile map to
-  `rawX/rawY` of 0,100,…,500 — and are consistent with the community slab, whose
-  floor slabs sit 400 units (8 steps) apart. `Raw{X,Y,Z}` stay exposed so any
-  rescale is lossless.
-- **`internal/buildings` is the library.** A slab is decoded, measured and filed
-  once under an id (`buildings add`), then reused by name. The manifest records
-  provenance (source / author / licence) and the measurements that matter for
-  placement: footprint, height, and the **ground level** to seat on terrain.
-  The library directory (`./buildings`, or `$TALESPIRE_BUILDINGS`) is
-  **gitignored** — it holds other people's builds, each under its own licence.
-- **`cmd/composemap` places a building on a generated map** (experimental, and
-  deliberately outside `internal/generator`: it composes the generator and
-  chimera from the outside, so the generation pipeline stays untouched). It
-  takes a library id or a file path, seats the building, clears what it
-  occupies, and can slice the result.
-- **Seating rule (learned the hard way).** Align the building's **ground level**
-  with the terrain surface — *not* its lowest piece. Builds often carry a cellar
-  or footings meant to end up buried; anchoring the bottom shoves the whole thing
-  into the air (the Smiling Goat Inn has 8.5 steps below its ground floor). The
-  ground level defaults to the slab's busiest level, which is almost always the
-  ground floor; check it with `slabdecode -levels` and override with
-  `buildings add -ground` or `composemap -building-ground`. Since TaleSpire has
-  no negative Z, the whole scene is raised when the buried part needs the room,
-  and the map's own ground is dropped on tiles where the build digs in.
+  step is half a tile). Settled by round-tripping the generator's own output — a
+  map at height 1 encodes to 50, and a 6-tile map to 0,100,…,500 — and
+  consistent with the community slab, whose floors sit 400 units (8 steps) apart.
+- **Seating rule (learned the hard way, in game).** Align the building's
+  **ground level** with the terrain surface — *not* its lowest piece. Builds
+  often carry a cellar or footings meant to end up buried; anchoring the bottom
+  shoves the whole thing into the air (the Smiling Goat Inn has 8.5 steps below
+  its ground floor, and floated by exactly that). The ground level defaults well
+  to the slab's busiest level, which is almost always the ground floor, but must
+  be overridable per building. Since TaleSpire has no negative Z, raise the whole
+  scene when the buried part needs the room, and drop the map's own ground on the
+  tiles where the build digs in.
 - **Sizing reality.** A whole map plus a whole building does not fit TaleSpire's
-  ~30 kB slab limit — the inn alone is 39 kB — so `composemap -slice N` is the
-  normal path, not a fallback.
+  ~30 kB slab limit — the inn alone is 39 kB — so slicing is the normal path, not
+  a fallback. A building kept whole inside one slice caps how small that slice
+  can get.
+- **Provenance is not optional.** Community builds carry per-creator licences
+  (several are CC BY-NC). Any catalogue that ships in the repo or in the binary
+  needs a licence field recorded per entry.
 
 ## Conventions
 
