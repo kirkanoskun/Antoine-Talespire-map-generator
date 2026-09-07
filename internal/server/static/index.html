@@ -167,6 +167,25 @@
       <button class="chip">Un marécage brumeux avec des huttes sur pilotis et un autel oublié.</button>
     </div>
 
+    <details class="adv hidden" id="prefabsPanel">
+      <summary>Bâtiments importés</summary>
+      <p class="lead">Ajoutez un code Slab pour réutiliser sa construction dans vos cartes. Les bâtiments disponibles seront inclus dans le prochain prompt.</p>
+      <ul id="prefabsList"></ul>
+      <div class="adv-grid">
+        <div><label for="prefabID">Identifiant</label><input id="prefabID" placeholder="auberge_pierre" maxlength="64"></div>
+        <div><label for="prefabName">Nom</label><input id="prefabName" placeholder="Auberge en pierre" maxlength="160"></div>
+        <div><label for="prefabAuthor">Créateur (facultatif)</label><input id="prefabAuthor" maxlength="200"></div>
+        <div><label for="prefabSource">Lien source (facultatif)</label><input id="prefabSource" type="url" maxlength="2000"></div>
+        <div><label for="prefabWidth">Largeur réservée (facultatif)</label><input id="prefabWidth" type="number" min="2" max="200" placeholder="Automatique"></div>
+        <div><label for="prefabLength">Longueur réservée (facultatif)</label><input id="prefabLength" type="number" min="2" max="200" placeholder="Automatique"></div>
+      </div>
+      <label for="prefabCode">Code Slab</label>
+      <textarea id="prefabCode" placeholder="Collez le code copié dans TaleSpire ou TalesTavern"></textarea>
+      <p class="muted">L’emprise est estimée à partir des positions des objets. Agrandissez-la pour les toits ou les éléments qui dépassent.</p>
+      <button class="primary" id="importPrefab">Importer le bâtiment</button>
+      <p id="prefabStatus" role="status" aria-live="polite"></p>
+    </details>
+
     <details class="adv">
       <summary>Options avancées</summary>
       <div class="adv-grid">
@@ -222,6 +241,8 @@
   <!-- STEP 4 — Map ready -->
   <section id="s4" class="hidden">
     <h2 class="title" id="mapTitle">Carte prête</h2>
+    <p class="muted">Les zones dorées indiquent les emprises réservées aux bâtiments, pas un rendu de leur architecture.</p>
+    <ul id="mapWarnings" role="status"></ul>
     <div class="row">
       <div>
         <label>Aperçu 2D (vue du dessus)</label>
@@ -283,6 +304,30 @@ async function copy(text, btn){
   try{ await navigator.clipboard.writeText(text); const t=btn.textContent; btn.textContent='Copié ✓'; setTimeout(()=>btn.textContent=t, 1400);}catch{ btn.textContent='⚠'; }
 }
 
+async function refreshPrefabs(){
+  const r = await fetch('/api/prefabs');
+  if (!r.ok) throw new Error('Impossible de charger les bâtiments');
+  const items = await r.json();
+  $('prefabsList').replaceChildren();
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.textContent = `${item.name} (${item.id}), ${item.width} × ${item.length} tuiles réservées, ${item.asset_count} objets`;
+    $('prefabsList').appendChild(li);
+  }
+  if (!items.length) $('prefabsList').textContent = 'Aucun bâtiment importé pour le moment.';
+}
+$('importPrefab').onclick = async () => {
+  $('importPrefab').disabled = true; $('prefabStatus').textContent = 'Vérification du Slab…';
+  try {
+    const entry = {id:$('prefabID').value.trim(), name:$('prefabName').value.trim() || $('prefabID').value.trim(), code:$('prefabCode').value, author:$('prefabAuthor').value.trim(), source_url:$('prefabSource').value.trim(), width:Number($('prefabWidth').value), length:Number($('prefabLength').value)};
+    const item = await postJSON('/api/prefabs/import', entry);
+    $('prefabCode').value = '';
+    $('prefabStatus').textContent = `${item.name} enregistré. Vous pouvez le demander dans votre description.`;
+    await refreshPrefabs();
+  } catch(e) { $('prefabStatus').textContent = 'Import refusé : ' + e.message; }
+  finally { $('importPrefab').disabled = false; }
+};
+
 // Examples fill the textarea
 for (const c of $('examples').querySelectorAll('.chip')){
   c.onclick = () => { $('desc').value = c.textContent.trim(); $('desc').focus(); };
@@ -326,6 +371,10 @@ $('drawMap').onclick = async () => {
 function showJsonErr(m){ const e=$('jsonErr'); e.textContent=m; e.style.display='block'; }
 
 function renderMap(data){
+  $('mapWarnings').replaceChildren();
+  for (const warning of data.warnings || []) {
+    const li = document.createElement('li'); li.textContent = warning; $('mapWarnings').appendChild(li);
+  }
   lastJSON = JSON.stringify(data.ir, null, 2);
   $('mapTitle').textContent = (data.ir && data.ir.map && data.ir.map.name) ? data.ir.map.name : 'Carte prête';
   $('preview').innerHTML = ''; const img = new Image(); img.src = data.preview_url; $('preview').appendChild(img);
@@ -361,6 +410,12 @@ fetch('/api/config').then(r=>r.json()).then(cfg => {
   }
 }).catch(()=>{});
 
+fetch('/api/config').then(r => r.json()).then(async cfg => {
+  if (cfg.prefabs_enabled) {
+    $('prefabsPanel').classList.remove('hidden');
+    await refreshPrefabs();
+  }
+}).catch(e => { $('prefabStatus').textContent = e.message; });
 setStep(1);
 </script>
 </body>

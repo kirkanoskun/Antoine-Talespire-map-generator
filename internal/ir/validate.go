@@ -50,6 +50,20 @@ func (doc *IR) Validate() error {
 		return fmt.Errorf("at least one zone is required")
 	}
 
+	if len(doc.Buildings) > 100 {
+		return fmt.Errorf("at most 100 buildings are allowed")
+	}
+	for i, b := range doc.Buildings {
+		if b.Prefab == "" || b.Position == nil {
+			return fmt.Errorf("building[%d]: prefab and position are required", i)
+		}
+		if !doc.inBounds(b.Position.X, b.Position.Y) {
+			return fmt.Errorf("building[%d]: position outside map bounds", i)
+		}
+		if b.Rotation != 0 && b.Rotation != 90 && b.Rotation != 180 && b.Rotation != 270 {
+			return fmt.Errorf("building[%d]: rotation must be 0, 90, 180 or 270", i)
+		}
+	}
 	ids := make(map[string]bool, len(doc.Zones))
 	for i := range doc.Zones {
 		z := &doc.Zones[i]
