@@ -14,8 +14,11 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +54,10 @@ type Server struct {
 // evicted once the cap is exceeded.
 const maxSessions = 64
 
+// session is an immutable snapshot: a new generation replaces the whole struct
+// in the map rather than mutating this one, so a reader may keep the pointer
+// after releasing s.mu. The one exception is lastSeq, which the LRU writes —
+// only ever under s.mu, and no reader outside the eviction loop looks at it.
 type session struct {
 	doc      *ir.IR
 	code     string
@@ -106,7 +113,26 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/quit", s.handleQuit)
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/", s.handleIndex)
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+				writeError(w, http.StatusForbidden, "cross-site request rejected")
+				return
+			}
+			if origin := r.Header.Get("Origin"); origin != "" {
+				u, err := url.Parse(origin)
+				scheme := "http"
+				if r.TLS != nil {
+					scheme = "https"
+				}
+				if err != nil || u.Scheme != scheme || u.Host != r.Host || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+					writeError(w, http.StatusForbidden, "cross-origin request rejected")
+					return
+				}
+			}
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 // handleConfig exposes UI-relevant capabilities: whether an NL backend is
@@ -319,17 +345,20 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 	}
 
 	s.mu.Lock()
-	sess := s.sessions[id]
-	if sess == nil {
-		sess = &session{}
-		s.sessions[id] = sess
+	version := 1
+	if previous := s.sessions[id]; previous != nil {
+		version = previous.version + 1
 	}
-	sess.doc = doc
-	sess.code = res.Code
-	sess.png = buf.Bytes()
-	sess.warnings = res.Warnings
-	sess.version++
-	version := sess.version
+	// Publish an immutable snapshot. Readers may retain this pointer after
+	// releasing mu while later requests replace the session in the map.
+	sess := &session{
+		doc:      doc,
+		code:     res.Code,
+		png:      buf.Bytes(),
+		warnings: res.Warnings,
+		version:  version,
+	}
+	s.sessions[id] = sess
 	s.touchLocked(sess)
 	s.evictLRULocked()
 	s.mu.Unlock()
@@ -375,11 +404,30 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 		writeError(w, http.StatusMethodNotAllowed, "POST required")
 		return false
 	}
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		writeBodyError(w, err)
+		return false
+	}
+	if err := dec.Decode(new(any)); err != io.EOF {
+		if err == nil {
+			err = fmt.Errorf("expected a single JSON document")
+		}
+		writeBodyError(w, err)
 		return false
 	}
 	return true
+}
+
+func writeBodyError(w http.ResponseWriter, err error) {
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		writeError(w, http.StatusRequestEntityTooLarge, "JSON body exceeds 1 MiB")
+		return
+	}
+	writeError(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

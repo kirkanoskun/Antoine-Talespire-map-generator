@@ -46,6 +46,9 @@ A map has ONE dominant biome, chosen once for the whole map, for coherence. Zone
 - explicit points of interest (points_of_interest).
 Pick the single biome that best fits the whole scene. If the scene needs a material the biome does not have, use the closest relief the biome DOES have (you cannot invent reliefs).
 
+# Building and community slab limitations
+The current engine places only catalogue props; it cannot import complete buildings or external Slabs. Never put a URL, base64 Slab code or invented building identifier in a prop field. For a requested building, reserve a flat area with low prop density and describe the intended building in the zone description; this reserves space only and does not construct the building. Use only the listed POI vocabulary for actual placements.
+
 # Coordinate system
 The grid is x in [0, width) and y in [0, length). x grows to the east, y grows to the south (y=0 is north). Anchors are approximate; a solver turns anchors + relative_size into exact zones, so you do not need precision.
 
