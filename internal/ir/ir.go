@@ -13,6 +13,7 @@ package ir
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -63,20 +64,22 @@ func (p *Position) UnmarshalJSON(data []byte) error {
 		if s != "scattered" {
 			return fmt.Errorf("unknown position keyword %q (expected \"scattered\")", s)
 		}
-		p.Scattered = true
+		*p = Position{Scattered: true}
 		return nil
 	}
 	var obj struct {
 		X *int `json:"x"`
 		Y *int `json:"y"`
 	}
-	if err := json.Unmarshal(data, &obj); err != nil {
+	dec := json.NewDecoder(strings.NewReader(trimmed))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&obj); err != nil {
 		return err
 	}
 	if obj.X == nil || obj.Y == nil {
 		return fmt.Errorf("explicit position must provide both x and y")
 	}
-	p.X, p.Y = *obj.X, *obj.Y
+	*p = Position{X: *obj.X, Y: *obj.Y}
 	return nil
 }
 
@@ -134,6 +137,9 @@ func Parse(data []byte) (*IR, error) {
 	var doc IR
 	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("decoding IR: %w", err)
+	}
+	if err := dec.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("decoding IR: expected a single JSON document")
 	}
 	if err := doc.Validate(); err != nil {
 		return nil, err
