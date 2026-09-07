@@ -29,8 +29,8 @@ import (
 	talespire "github.com/kirkanoskun/antoine-talespire-map-generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/server"
- "github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 )
 
 func main() {
@@ -70,26 +70,30 @@ func main() {
 		log.Fatalf("initialising generator: %v", err)
 	}
 	gen.SetTransitionHalfWidth(*transition)
- if *prefabsPath == "" {
-  homeDir, err := os.UserHomeDir()
-  if err != nil { log.Fatalf("locating prefab catalogue: %v", err) }
-  *prefabsPath = filepath.Join(homeDir, ".talespire", "prefabs.json")
- }
- prefabs, err := prefab.Open(*prefabsPath, talespire.PrefabCatalog())
- if err != nil { log.Fatalf("loading prefabs: %v", err) }
- gen.SetPrefabs(prefabs)
+	if *prefabsPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("locating prefab catalogue: %v", err)
+		}
+		*prefabsPath = filepath.Join(homeDir, ".talespire", "prefabs.json")
+	}
+	prefabs, err := prefab.Open(*prefabsPath, talespire.PrefabCatalog())
+	if err != nil {
+		log.Fatalf("loading prefabs: %v", err)
+	}
+	gen.SetPrefabs(prefabs)
 
 	catalog, err := nl.LoadCatalog(biomesPath, generator.POIAliasNames())
 	if err != nil {
 		log.Fatalf("loading catalog: %v", err)
 	}
- catalog.Prefabs = prefabs
+	catalog.Prefabs = prefabs
 	interp := nl.NewInterpreter(nl.NewAnthropicCompleter(nl.AnthropicConfig{Model: *model}), catalog)
 
 	httpSrv := &http.Server{}
 	srv := server.New(gen, server.Options{
 		Catalog:      catalog,
- Prefabs: prefabs,
+		Prefabs:      prefabs,
 		Interpreter:  interp,
 		PreviewScale: *scale,
 		MaxRetries:   *maxRetries,

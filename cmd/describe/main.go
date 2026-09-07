@@ -23,9 +23,9 @@ import (
 	"github.com/joho/godotenv"
 
 	talespire "github.com/kirkanoskun/antoine-talespire-map-generator"
- "github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
- "github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/preview"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
@@ -52,10 +52,14 @@ func main() {
 	transition := flag.Int("transition", 3, "zone-border stitching half-width in tiles (0 = hard borders)")
 	prefabsPath := flag.String("prefabs", "", "optional external prefab catalogue instead of the embedded catalogue")
 	flag.Parse()
- builtin := talespire.PrefabCatalog()
- if *prefabsPath != "" { builtin = nil }
- prefabs, err := prefab.Open(*prefabsPath, builtin)
- if err != nil { log.Fatalf("loading prefabs: %v", err) }
+	builtin := talespire.PrefabCatalog()
+	if *prefabsPath != "" {
+		builtin = nil
+	}
+	prefabs, err := prefab.Open(*prefabsPath, builtin)
+	if err != nil {
+		log.Fatalf("loading prefabs: %v", err)
+	}
 
 	desc := *description
 	if *descFile != "" {

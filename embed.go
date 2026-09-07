@@ -41,6 +41,6 @@ func WriteConfigs() (biomesPath, propsPath string, cleanup func(), err error) {
 
 // PrefabCatalog returns a fresh copy of the built-in community prefab catalogue.
 func PrefabCatalog() []byte {
- data, _ := configsFS.ReadFile("configs/prefabs.json")
- return data
+	data, _ := configsFS.ReadFile("configs/prefabs.json")
+	return data
 }
