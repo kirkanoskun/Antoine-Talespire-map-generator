@@ -45,14 +45,26 @@ type Server struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
+	seq      int64 // monotonic access counter for LRU eviction (guarded by mu)
 }
 
+// maxSessions bounds the in-memory session cache so a long-lived server (the
+// desktop app runs for a whole play session) does not grow without bound. Each
+// session holds a rendered PNG plus the IR; the least-recently-used one is
+// evicted once the cap is exceeded.
+const maxSessions = 64
+
+// session is an immutable snapshot: a new generation replaces the whole struct
+// in the map rather than mutating this one, so a reader may keep the pointer
+// after releasing s.mu. The one exception is lastSeq, which the LRU writes —
+// only ever under s.mu, and no reader outside the eviction loop looks at it.
 type session struct {
 	doc      *ir.IR
 	code     string
 	png      []byte
 	warnings []string
 	version  int
+	lastSeq  int64 // last access order, for LRU eviction
 }
 
 // Options configures a Server.
@@ -92,6 +104,7 @@ func New(gen *generator.Generator, opts Options) *Server {
 // Handler returns the HTTP handler for the whole app.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
 	mux.HandleFunc("/api/prompt", s.handlePrompt)
 	mux.HandleFunc("/api/describe", s.handleDescribe)
 	mux.HandleFunc("/api/adjust", s.handleAdjust)
@@ -243,6 +256,11 @@ func (s *Server) handleAdjust(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	sess := s.sessions[req.Session]
+	var doc *ir.IR
+	if sess != nil {
+		doc = sess.doc
+		s.touchLocked(sess)
+	}
 	s.mu.Unlock()
 	if sess == nil {
 		writeError(w, http.StatusNotFound, "unknown session")
@@ -251,7 +269,7 @@ func (s *Server) handleAdjust(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
-	res, err := s.interp.Adjust(ctx, sess.doc, req.Message, nl.Options{MaxRetries: s.maxRetries})
+	res, err := s.interp.Adjust(ctx, doc, req.Message, nl.Options{MaxRetries: s.maxRetries})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -280,15 +298,19 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("session")
 	s.mu.Lock()
-	sess := s.sessions[id]
+	var png []byte
+	if sess := s.sessions[id]; sess != nil {
+		png = sess.png
+		s.touchLocked(sess)
+	}
 	s.mu.Unlock()
-	if sess == nil || sess.png == nil {
+	if png == nil {
 		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(sess.png)
+	w.Write(png)
 }
 
 // finish generates the map for doc, stores it under the session (creating one if
@@ -311,23 +333,34 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 		return
 	}
 
-	s.mu.Lock()
+	// Mint the session id before taking the lock so a crypto/rand failure is
+	// surfaced as an error instead of a silent zero-value collision.
 	if id == "" {
-		id = newID()
+		nid, err := newID()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "generating session id: "+err.Error())
+			return
+		}
+		id = nid
 	}
+
+	s.mu.Lock()
 	version := 1
 	if previous := s.sessions[id]; previous != nil {
 		version = previous.version + 1
 	}
 	// Publish an immutable snapshot. Readers may retain this pointer after
 	// releasing mu while later requests replace the session in the map.
-	s.sessions[id] = &session{
+	sess := &session{
 		doc:      doc,
 		code:     res.Code,
 		png:      buf.Bytes(),
 		warnings: res.Warnings,
 		version:  version,
 	}
+	s.sessions[id] = sess
+	s.touchLocked(sess)
+	s.evictLRULocked()
 	s.mu.Unlock()
 
 	irJSON, _ := json.Marshal(doc)
@@ -343,6 +376,28 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 }
 
 // --- helpers ---
+
+// touchLocked marks sess as most-recently-used. Callers must hold s.mu.
+func (s *Server) touchLocked(sess *session) {
+	s.seq++
+	sess.lastSeq = s.seq
+}
+
+// evictLRULocked drops the least-recently-used session while the cache is over
+// the cap. Callers must hold s.mu.
+func (s *Server) evictLRULocked() {
+	for len(s.sessions) > maxSessions {
+		var oldestID string
+		var oldest int64
+		first := true
+		for id, sess := range s.sessions {
+			if first || sess.lastSeq < oldest {
+				oldest, oldestID, first = sess.lastSeq, id, false
+			}
+		}
+		delete(s.sessions, oldestID)
+	}
+}
 
 func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	if r.Method != http.MethodPost {
@@ -385,8 +440,10 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func newID() string {
+func newID() (string, error) {
 	var b [8]byte
-	rand.Read(b[:])
-	return hex.EncodeToString(b[:])
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }

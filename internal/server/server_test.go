@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
@@ -71,6 +72,21 @@ func TestIndexServed(t *testing.T) {
 	}
 }
 
+func TestStaticLogoServed(t *testing.T) {
+	h := newServer(t, nil)
+	for _, name := range []string{"logo.png", "emblem.png"} {
+		req := httptest.NewRequest(http.MethodGet, "/static/"+name, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("/static/%s status %d", name, rec.Code)
+		}
+		if !bytes.HasPrefix(rec.Body.Bytes(), []byte("\x89PNG")) {
+			t.Errorf("/static/%s is not a PNG", name)
+		}
+	}
+}
+
 func TestGenerateFromIRThenPreview(t *testing.T) {
 	h := newServer(t, nil)
 	rec, out := post(t, h, "/api/generate", `{"ir":`+cannedIR+`}`)
@@ -106,6 +122,54 @@ func TestGenerateRejectsInvalidIR(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid IR, got %d", rec.Code)
 	}
+}
+
+func TestSessionLRUEviction(t *testing.T) {
+	h := newServer(t, nil)
+	// The first session is never touched again, so it stays least-recently-used.
+	_, out := post(t, h, "/api/generate", `{"ir":`+cannedIR+`}`)
+	first, _ := out["session"].(string)
+	if first == "" {
+		t.Fatal("no session from first generate")
+	}
+	// Create well past the cap (maxSessions = 64) so the first is evicted.
+	for i := 0; i < 80; i++ {
+		post(t, h, "/api/generate", `{"ir":`+cannedIR+`}`)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/preview?session="+first, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected evicted session preview to 404, got %d", rec.Code)
+	}
+}
+
+// TestConcurrentGenerateAndPreview exercises finish() writing a session while
+// handlePreview reads it, guarding the fix that reads png under the lock. Run
+// with -race to catch a regression.
+func TestConcurrentGenerateAndPreview(t *testing.T) {
+	h := newServer(t, nil)
+	_, out := post(t, h, "/api/generate", `{"ir":`+cannedIR+`}`)
+	sess, _ := out["session"].(string)
+	if sess == "" {
+		t.Fatal("no session")
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 25; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost, "/api/generate",
+				strings.NewReader(`{"session":"`+sess+`","ir":`+cannedIR+`}`))
+			h.ServeHTTP(httptest.NewRecorder(), req)
+		}()
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/api/preview?session="+sess, nil)
+			h.ServeHTTP(httptest.NewRecorder(), req)
+		}()
+	}
+	wg.Wait()
 }
 
 func TestDescribeAndAdjust(t *testing.T) {

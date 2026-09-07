@@ -73,7 +73,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("loading catalog: %v", err)
 	}
-	interp := nl.NewInterpreter(nl.NewAnthropicCompleter(nl.AnthropicConfig{Model: *model}), catalog)
+
+	// Only wire the natural-language backend when a credential is present. Without
+	// one the keyless prompt flow (/api/prompt) and the "apply edited IR" path
+	// still work, and /api/describe & /api/adjust report 503 as documented — the
+	// UI hides those controls because /api/config then reports nl_enabled:false.
+	var interp *nl.Interpreter
+	if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		interp = nl.NewInterpreter(nl.NewAnthropicCompleter(nl.AnthropicConfig{Model: *model}), catalog)
+	} else {
+		log.Print("no ANTHROPIC_API_KEY found: natural-language features disabled; the keyless prompt flow still works")
+	}
 
 	httpSrv := &http.Server{}
 	srv := server.New(gen, server.Options{
