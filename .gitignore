@@ -17,3 +17,7 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Local library of community buildings (other players' work, each under its own
+# licence). Never commit it: the repository is public.
+/buildings/
