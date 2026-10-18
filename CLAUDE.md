@@ -281,6 +281,14 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   handlers; a direct `ServeHTTP` call does not, and in the browser a panic would
   kill the engine for the rest of the session. `cmd/web`'s `call` recovers and
   answers with the server's own `{"error": …}` shape.
+- **No third-party requests, and a legal notice that says so.** Fonts are
+  self-hosted (`static/fonts/`, Fontsource latin subset, OFL licences alongside)
+  instead of Google Fonts, which hands every visitor's IP to Google — a GDPR
+  problem for a public French site. `static/mentions-legales.html` (LCEN legal
+  notice, linked from the footer, served on desktop and web alike) states that
+  nothing is collected or loaded from third parties;
+  `TestPagesLoadOnlyTheirOwnResources` keeps that true. Adding analytics or any
+  external service means updating that page.
 - **Testing in the real runtime.** `cmd/web` tests run natively *and* compiled
   to wasm under Node (`GOOS=js GOARCH=wasm go test`, with `env -i`: Go's
   `wasm_exec` refuses an environment over ~12 kB). The **Website** workflow

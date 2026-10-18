@@ -20,6 +20,14 @@ scripts/build-web.sh     → dist/web/  (le site complet)
   index.html, static/    l'interface de l'app de bureau, inchangée
 ```
 
+Le site ne charge rien depuis un service tiers : les polices (Cinzel, Work Sans,
+licence OFL) sont hébergées dans `static/fonts/`, et un test
+(`TestPagesLoadOnlyTheirOwnResources`) échoue si une page se remet à appeler un
+autre domaine. Les mentions légales (`static/mentions-legales.html`) sont liées
+en bas de chaque page ; elles affirment cette absence de collecte, donc
+mettez-les à jour si un jour le site ajoute une mesure d'audience ou un service
+externe.
+
 À chaque push sur `main`, le workflow GitHub **Website** reconstruit le site,
 teste le moteur dans son vrai runtime WebAssembly, puis le publie sur Cloudflare
 Pages. Sur une PR, il construit et teste sans publier.
@@ -57,14 +65,25 @@ Onglet **Actions** → **Website** → **Run workflow** (ou simplement un push s
 est alors en ligne sur `https://le-cartographe.pages.dev` (Cloudflare ajoute un
 suffixe si ce nom est déjà pris : l'adresse exacte s'affiche à la fin du job).
 
-### 4. Brancher votre sous-domaine
+### 4. Brancher le sous-domaine `cartographe.antoinedebaets.com`
 
-Cloudflare → **Workers & Pages** → **le-cartographe** → **Custom domains** →
-**Set up a custom domain** → saisissez le sous-domaine (par exemple
-`cartographe.votredomaine.fr`) → **Activate domain**.
+1. Vérifiez que le domaine est bien géré par Cloudflare : la page d'accueil du
+   tableau de bord liste `antoinedebaets.com` avec le statut **Active**.
+2. **Workers & Pages** → **le-cartographe** → onglet **Custom domains** →
+   **Set up a custom domain**.
+3. Saisissez `cartographe.antoinedebaets.com` → **Continue** →
+   **Activate domain**.
 
-Comme le DNS du domaine est déjà chez Cloudflare, l'enregistrement DNS et le
-certificat HTTPS sont créés automatiquement. Comptez quelques minutes.
+Cloudflare crée lui-même l'enregistrement DNS (un `CNAME` `cartographe` →
+`le-cartographe.pages.dev`) et le certificat HTTPS. Le statut passe de
+**Initializing** à **Active**, en général en moins de 10 minutes.
+
+N'ajoutez pas le `CNAME` à la main dans l'onglet DNS : un enregistrement
+préexistant sur ce nom bloque l'activation. Si cela arrive, supprimez-le et
+relancez l'étape 3.
+
+L'adresse `le-cartographe.pages.dev` reste accessible ; le site est le même aux
+deux adresses.
 
 ## Sans attendre GitHub : glisser-déposer
 

@@ -25,7 +25,10 @@ done
 
 echo "==> assembling the site"
 cp web/cartographe.js web/_headers "$OUT/"
-cp internal/server/static/logo.png internal/server/static/emblem.png "$OUT/static/"
+# Everything the desktop app serves under /static/ (logos, fonts, legal page);
+# index.html is assembled separately below.
+cp -R internal/server/static/. "$OUT/static/"
+rm "$OUT/static/index.html"
 
 # The page is the desktop app's own index.html, with the engine loaded before
 # the UI's script so the UI's first request is already routed to it.
