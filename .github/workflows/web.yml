@@ -1,0 +1,68 @@
+name: Website
+
+# Builds the static site (scripts/build-web.sh), tests the engine in its real
+# WebAssembly runtime, and publishes it to Cloudflare Workers on every push to
+# main. See docs/site-web.md for the one-time Cloudflare setup.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the site
+        run: scripts/build-web.sh
+      - name: Test the engine in its WebAssembly runtime
+        # Go's wasm_exec refuses an environment over ~12 kB, hence env -i.
+        run: |
+          env -i PATH="$PATH:$(go env GOROOT)/lib/wasm" HOME="$HOME" \
+            GOCACHE="$(go env GOCACHE)" GOMODCACHE="$(go env GOMODCACHE)" \
+            GOOS=js GOARCH=wasm go test ./cmd/web/ ./internal/catalogs/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/web
+          retention-days: 14
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      CONFIGURED: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4 # for wrangler.jsonc
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist/web
+      - name: Cloudflare not configured yet
+        if: env.CONFIGURED != 'true'
+        run: echo "::notice::Site built but not deployed — add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/site-web.md)."
+      - uses: actions/setup-node@v4
+        if: env.CONFIGURED == 'true'
+        with:
+          node-version: 22
+      - name: Deploy to Cloudflare Workers
+        if: env.CONFIGURED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Creates the Worker on first run, updates it afterwards; the custom
+        # domain attached in the dashboard is kept across deploys.
+        run: npx --yes wrangler@4 deploy
