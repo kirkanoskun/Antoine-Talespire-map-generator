@@ -135,7 +135,7 @@ cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
 cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
 cmd/server/           HTTP server for the web UI
 cmd/web/              the same API compiled to WebAssembly, for the public website
-web/                  the browser bridge (cartographe.js) and Pages headers
+web/                  the browser bridge (cartographe.js) and response headers
 internal/ir/          IR types, strict JSON parsing & validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
 internal/generator/   zone-aware slab generation, stitching, paths, mapper
@@ -258,7 +258,7 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   toolchain (no `lipo`/Command Line Tools). `--universal` still fuses an
   Intel+Apple-Silicon binary when `lipo` is available.
 
-### Public website (Cloudflare Pages)
+### Public website (Cloudflare Workers static assets)
 
 - **Static site, engine in the browser.** The site needs no server: `cmd/web`
   compiles the desktop app's own `internal/server` handler to WebAssembly, and
@@ -292,9 +292,15 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **Testing in the real runtime.** `cmd/web` tests run natively *and* compiled
   to wasm under Node (`GOOS=js GOARCH=wasm go test`, with `env -i`: Go's
   `wasm_exec` refuses an environment over ~12 kB). The **Website** workflow
-  does both, then deploys with `wrangler pages deploy` when the
+  does both, then deploys with `wrangler deploy` when the
   `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets exist. Setup guide:
   `docs/site-web.md`.
+- **Hosted as an assets-only Worker, not Pages.** Cloudflare's dashboard now
+  labels Pages "legacy", so `wrangler.jsonc` declares an assets-only Worker
+  (no script): free and unlimited on the Free plan, since no Worker code runs.
+  `wrangler dev` runs the real workerd runtime locally — the Chromium journey
+  passes on it. Keep the default `html_handling`: `"none"` would spare the
+  legal page's one `.html` → extension-less redirect, but makes `/` a 404.
 
 ### Phase 3 stitching notes
 

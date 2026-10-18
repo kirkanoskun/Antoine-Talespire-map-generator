@@ -29,76 +29,81 @@ mettez-les à jour si un jour le site ajoute une mesure d'audience ou un service
 externe.
 
 À chaque push sur `main`, le workflow GitHub **Website** reconstruit le site,
-teste le moteur dans son vrai runtime WebAssembly, puis le publie sur Cloudflare
-Pages. Sur une PR, il construit et teste sans publier.
+teste le moteur dans son vrai runtime WebAssembly, puis le publie sur Cloudflare.
+Sur une PR, il construit et teste sans publier.
 
-## Mise en place (une seule fois)
+## Hébergement : un « Worker » sans code, gratuit
 
-> Rédigé sans avoir pu ouvrir le site de Cloudflare depuis l'environnement de
-> développement : un libellé de menu peut avoir légèrement changé.
+Le site est publié comme un **Worker à fichiers statiques** (`wrangler.jsonc`),
+la formule que Cloudflare propose désormais à la place de Pages (que son
+tableau de bord marque « legacy »). Aucun code ne tourne chez Cloudflare : il
+sert des fichiers, et c'est **gratuit et illimité sur le plan Free**. Les
+limites du plan Workers Free (100 000 requêtes par jour, 10 ms de calcul) ne
+concernent que le code exécuté chez Cloudflare, donc pas ce site. Seule limite
+pertinente : 25 Mo par fichier ; le plus gros, `app.wasm`, fait ~13,5 Mo.
 
-### 1. Créer un jeton d'API Cloudflare
+Le nom du Worker est **`le-cartographe`**, partout : dans `wrangler.jsonc`, à la
+mise en ligne manuelle et dans le workflow. Un autre nom créerait un second
+site au lieu de mettre à jour le premier.
 
-1. Tableau de bord Cloudflare → icône de profil → **My Profile** → **API Tokens**
-   → **Create Token** → **Create Custom Token**.
-2. Nom : `Le Cartographe — GitHub`.
-3. Permissions : **Account** · **Cloudflare Pages** · **Edit**. Rien d'autre.
-4. **Continue to summary** → **Create Token**, puis copiez le jeton (il n'est
-   affiché qu'une fois).
+## Mise en ligne
 
-Notez aussi votre **Account ID** : **Workers & Pages** → colonne de droite.
+### 1. Première publication (glisser-déposer, 2 minutes)
 
-### 2. Donner ces deux valeurs à GitHub
+1. Récupérez le site construit : `scripts/build-web.sh` produit `dist/web/`
+   (ou téléchargez l'artefact **site** d'un job **Website** sur GitHub).
+2. Cloudflare → **Workers & Pages** → **Create** → **Upload your static files**.
+3. Nom : `le-cartographe`. Déposez le **contenu** de `dist/web/` (`index.html`,
+   `app.wasm`, le dossier `static`…), pas le dossier parent → **Deploy**.
+4. Le site répond sur `https://le-cartographe.<votre-compte>.workers.dev`.
 
-Dépôt GitHub → **Settings** → **Secrets and variables** → **Actions** →
-**New repository secret**, deux fois :
+### 2. Brancher le sous-domaine `cartographe.antoinedebaets.com`
 
-| Nom                     | Valeur              |
-|-------------------------|---------------------|
-| `CLOUDFLARE_API_TOKEN`  | le jeton de l'étape 1 |
-| `CLOUDFLARE_ACCOUNT_ID` | l'Account ID        |
-
-### 3. Publier
-
-Onglet **Actions** → **Website** → **Run workflow** (ou simplement un push sur
-`main`). Le premier déploiement crée le projet Pages `le-cartographe`. Le site
-est alors en ligne sur `https://le-cartographe.pages.dev` (Cloudflare ajoute un
-suffixe si ce nom est déjà pris : l'adresse exacte s'affiche à la fin du job).
-
-### 4. Brancher le sous-domaine `cartographe.antoinedebaets.com`
-
-1. Vérifiez que le domaine est bien géré par Cloudflare : la page d'accueil du
+1. Vérifiez que le domaine est géré par Cloudflare : la page d'accueil du
    tableau de bord liste `antoinedebaets.com` avec le statut **Active**.
-2. **Workers & Pages** → **le-cartographe** → onglet **Custom domains** →
-   **Set up a custom domain**.
-3. Saisissez `cartographe.antoinedebaets.com` → **Continue** →
-   **Activate domain**.
+2. **Workers & Pages** → **le-cartographe** → **Settings** →
+   **Domains & Routes** → **Add** → **Custom domain**.
+3. Saisissez `cartographe.antoinedebaets.com` → **Add domain**.
 
-Cloudflare crée lui-même l'enregistrement DNS (un `CNAME` `cartographe` →
-`le-cartographe.pages.dev`) et le certificat HTTPS. Le statut passe de
-**Initializing** à **Active**, en général en moins de 10 minutes.
+Cloudflare crée lui-même l'enregistrement DNS et le certificat HTTPS ; comptez
+quelques minutes. **Ne créez pas d'enregistrement DNS à la main** pour ce nom :
+un enregistrement existant bloque l'ajout (« already has externally managed DNS
+records »). Si cela arrive, supprimez-le dans l'onglet **DNS** du domaine et
+recommencez l'étape 3.
 
-N'ajoutez pas le `CNAME` à la main dans l'onglet DNS : un enregistrement
-préexistant sur ce nom bloque l'activation. Si cela arrive, supprimez-le et
-relancez l'étape 3.
+L'adresse en `workers.dev` reste accessible ; c'est le même site.
 
-L'adresse `le-cartographe.pages.dev` reste accessible ; le site est le même aux
-deux adresses.
+### 3. Mises à jour automatiques depuis GitHub (facultatif)
 
-## Sans attendre GitHub : glisser-déposer
+Sans cette étape, chaque nouvelle version se publie en refaisant le
+glisser-déposer. Avec, chaque push sur `main` est publié tout seul.
 
-Pour une mise en ligne immédiate, sans jeton : construisez le site
-(`scripts/build-web.sh`, ou téléchargez l'artefact **site** d'un job **Website**),
-puis Cloudflare → **Workers & Pages** → **Create** → **Pages** → **Upload
-assets**, nommez le projet `le-cartographe` et déposez le dossier `dist/web`.
+1. **Jeton d'API** : icône de profil → **My Profile** → **API Tokens** →
+   **Create Token** → modèle **Edit Cloudflare Workers** → **Use template**.
+   Dans **Account Resources**, choisissez votre compte ; dans
+   **Zone Resources**, `antoinedebaets.com` suffit. → **Continue to summary**
+   → **Create Token**, puis copiez le jeton (il n'est affiché qu'une fois).
+2. **Account ID** : **Workers & Pages** → colonne de droite (c'est aussi la
+   longue suite de caractères dans l'adresse du tableau de bord).
+3. Dépôt GitHub → **Settings** → **Secrets and variables** → **Actions** →
+   **New repository secret**, deux fois :
 
-Gardez bien ce nom : le workflow GitHub publiera ensuite dans le même projet.
+   | Nom                     | Valeur                |
+   |-------------------------|-----------------------|
+   | `CLOUDFLARE_API_TOKEN`  | le jeton              |
+   | `CLOUDFLARE_ACCOUNT_ID` | l'Account ID          |
+
+4. Onglet **Actions** → **Website** → **Run workflow** pour vérifier : le job
+   **deploy** doit finir en vert et met à jour le Worker `le-cartographe`. Le
+   sous-domaine reste branché d'un déploiement à l'autre.
 
 ## Tester localement
 
 ```sh
 scripts/build-web.sh
-cd dist/web && python3 -m http.server 8000   # puis http://localhost:8000
+npx wrangler dev        # le vrai moteur de Cloudflare, sur http://localhost:8787
+# ou, sans Node :
+cd dist/web && python3 -m http.server 8000
 ```
 
 Le site doit être servi en HTTP : ouvrir `index.html` directement depuis le

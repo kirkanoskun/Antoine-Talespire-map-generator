@@ -2,7 +2,7 @@
 # Build the public website: a fully static site where the map engine runs in
 # the visitor's browser (Go compiled to WebAssembly, see cmd/web). Needs only
 # the Go toolchain. Output goes to dist/web/, ready for any static host — the
-# deployment workflow publishes it to Cloudflare Pages.
+# deployment workflow publishes it to Cloudflare Workers (wrangler.jsonc).
 #
 # Usage: scripts/build-web.sh
 set -euo pipefail

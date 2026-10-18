@@ -88,7 +88,7 @@ Without a key, the app still runs and the "apply edited IR" path works offline.
 The same app also ships as a fully static website: the generation engine is
 compiled to WebAssembly and runs in the visitor's browser, so there is no server
 to host. `./scripts/build-web.sh` builds it into `dist/web/`; the **Website**
-GitHub workflow publishes it to Cloudflare Pages. It runs in keyless mode (the
+GitHub workflow publishes it to Cloudflare Workers (static assets, free plan). It runs in keyless mode (the
 AI features would otherwise spend the owner's key on every visitor). Setup
 guide, in French: [`docs/site-web.md`](docs/site-web.md).
 
