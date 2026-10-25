@@ -24,6 +24,8 @@ import (
 
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/catalogs"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/slab"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
 
@@ -52,6 +54,7 @@ type Generator struct {
 	transitionHalf  int
 	smoothingPasses int
 	sliceSize       int
+	prefabs         *prefab.Store
 }
 
 // New loads the biome and prop catalogues from the given config paths.
@@ -129,9 +132,11 @@ type Result struct {
 
 // HeightField exposes the shaped terrain so the preview renderer can shade it.
 type HeightField struct {
-	Width  int
-	Length int
-	tiles  [][]tile
+	Width     int
+	Length    int
+	tiles     [][]tile
+	buildings [][]bool
+	dug       [][]bool // ground removed under a building's underground part
 }
 
 // HeightAt returns the terrain height at (x,y).
@@ -187,11 +192,16 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		g.carvePaths(doc, field, paths)
 	}
 
+	buildingParts, err := g.placeBuildings(doc, field)
+	if err != nil {
+		return nil, err
+	}
 	res := &Result{Height: field}
 	var placements []placement
 	placements = g.placeGround(placements, biome, field, rng)
 	placements = g.placeProps(placements, biome, doc, field, trans, paths, rng)
 	placements = g.placePOIs(placements, doc, mask, field, rng, res)
+	placements = append(placements, buildingParts...)
 	res.AssetCount = len(placements)
 
 	// Whole-map slab (always produced, for a single copy-paste).
@@ -224,20 +234,52 @@ type placement struct {
 	tileX, tileY int
 	z            int
 	baseRotation int
+	imported     *slab.Layout
 }
 
 // encodeRegion builds and encodes a single slab from the placements whose tile
 // falls in the region [originX, originX+size) — or all placements when size is
 // non-positive — with coordinates rebased to (originX, originY).
 func (g *Generator) encodeRegion(placements []placement, originX, originY int) (string, error) {
-	slab := &taleslabentities.Slab{}
+	terrain := &taleslabentities.Slab{}
+	var imported []slab.Layout
+	importedIndex := map[string]int{}
 	for i := range placements {
 		p := &placements[i]
-		slab.Assets = append(slab.Assets, buildAsset(p, originX, originY))
+		if p.imported == nil {
+			terrain.Assets = append(terrain.Assets, buildAsset(p, originX, originY))
+		} else {
+			l := *p.imported
+			l.Instances = append([]slab.Instance(nil), l.Instances...)
+			for j := range l.Instances {
+				l.Instances[j].X -= originX * 100
+				l.Instances[j].Z -= originY * 100
+			}
+			key := fmt.Sprintf("%x/%d", l.ID, l.Reserved)
+			if idx, ok := importedIndex[key]; ok {
+				imported[idx].Instances = append(imported[idx].Instances, l.Instances...)
+			} else {
+				importedIndex[key] = len(imported)
+				imported = append(imported, l)
+			}
+		}
 	}
-	code, err := g.enc.Encode(taleSpireSlabFromSlab(slab))
+	code, err := g.enc.Encode(taleSpireSlabFromSlab(terrain))
 	if err != nil {
-		return "", fmt.Errorf("encoding slab: %w", err)
+		return "", fmt.Errorf("encoding terrain: %w", err)
+	}
+	if len(imported) > 0 {
+		// Preserve the existing terrain pipeline byte-for-byte when no buildings
+		// are present. Imported layouts bypass talescoder's lossy axis adapter.
+		combined, err := slab.DecodeGenerated(code)
+		if err != nil {
+			return "", fmt.Errorf("decoding terrain for prefab merge: %w", err)
+		}
+		combined.Layouts = append(combined.Layouts, imported...)
+		code, err = slab.Encode(combined)
+		if err != nil {
+			return "", fmt.Errorf("encoding buildings: %w", err)
+		}
 	}
 	return code, nil
 }
@@ -348,7 +390,9 @@ func (g *Generator) placeGround(out []placement, biome *taleslabentities.Biome, 
 		for y := 0; y < f.Length; y++ {
 			t := f.tiles[x][y]
 			block := g.buildingBlock(biome, t.relief, rng)
-			if block == nil {
+			// A dug tile still draws its block, so digging a cellar leaves the
+			// random sequence — and so the rest of the map — unchanged.
+			if block == nil || f.dugAt(x, y) {
 				continue
 			}
 
@@ -391,7 +435,7 @@ func (g *Generator) placeProps(out []placement, biome *taleslabentities.Biome, d
 
 	for x := 1; x < f.Width-1; x++ {
 		for y := 1; y < f.Length-1; y++ {
-			if tooClose(occupied, x, y) {
+			if f.BuildingAt(x, y) || tooClose(occupied, x, y) {
 				continue
 			}
 			if paths != nil && paths.On(x, y) {
@@ -471,6 +515,10 @@ func (g *Generator) placePOIs(out []placement, doc *ir.IR, mask *spatial.Mask, f
 
 			for _, p := range positions {
 				x, y := p[0], p[1]
+				if f.BuildingAt(x, y) {
+					res.Warnings = append(res.Warnings, fmt.Sprintf("zone %q: POI %q overlaps a reserved building footprint (skipped)", zone.ID, poi.Prop))
+					continue
+				}
 				rot := randomRotation(rng)
 				for _, part := range prop.Parts {
 					out = append(out, placement{part: part, tileX: x, tileY: y, z: f.tiles[x][y].height + part.OffsetZ, baseRotation: rot})

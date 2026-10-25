@@ -32,3 +32,12 @@ func TestPositionRejectsUnknownFieldsAndResets(t *testing.T) {
 		t.Fatalf("stale position: %+v", p)
 	}
 }
+
+func TestBuildingPlacementValidation(t *testing.T) {
+	for _, b := range []string{`{"prefab":"house"}`, `{"position":{"x":1,"y":1}}`, `{"prefab":"house","position":{"x":1,"y":1},"rotation":45}`} {
+		raw := `{"map":{"width":10,"length":10,"biome":"temperate_forest"},"zones":[{"id":"a","anchor":{"x":5,"y":5},"relative_size":1}],"buildings":[` + b + `]}`
+		if _, err := Parse([]byte(raw)); err == nil {
+			t.Fatal("invalid building accepted")
+		}
+	}
+}

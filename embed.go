@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-//go:embed configs/biomes.json configs/props.json
+//go:embed configs/biomes.json configs/props.json configs/prefabs.json
 var configsFS embed.FS
 
 // BiomesJSON returns the embedded biomes.json, for builds without a
@@ -54,4 +54,10 @@ func WriteConfigs() (biomesPath, propsPath string, cleanup func(), err error) {
 		}
 	}
 	return filepath.Join(dir, "biomes.json"), filepath.Join(dir, "props.json"), cleanup, nil
+}
+
+// PrefabCatalog returns a fresh copy of the built-in community prefab catalogue.
+func PrefabCatalog() []byte {
+	data, _ := configsFS.ReadFile("configs/prefabs.json")
+	return data
 }

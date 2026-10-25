@@ -9,6 +9,7 @@ package nl
 
 import (
 	"fmt"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"sort"
 
 	domainrepos "github.com/johnfercher/taleslab/pkg/taleslab/taleslabdomain/taleslabrepositories"
@@ -23,6 +24,7 @@ import (
 // into the system prompt and used to validate the model's output before the
 // generator ever sees it.
 type Catalog struct {
+	Prefabs *prefab.Store
 	// Biomes maps a biome id to its sorted relief keys.
 	Biomes map[string][]string
 	// POINames is the sorted list of understood point-of-interest names.

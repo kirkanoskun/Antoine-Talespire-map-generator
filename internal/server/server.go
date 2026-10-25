@@ -26,6 +26,7 @@ import (
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/preview"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
@@ -35,6 +36,7 @@ var staticFS embed.FS
 
 // Server holds the generation dependencies and the live sessions.
 type Server struct {
+	prefabs     *prefab.Store
 	gen         *generator.Generator
 	catalog     *nl.Catalog     // for the keyless prompt-generation flow
 	interp      *nl.Interpreter // may be nil if no NL backend is configured
@@ -69,6 +71,7 @@ type session struct {
 
 // Options configures a Server.
 type Options struct {
+	Prefabs *prefab.Store
 	// Catalog powers the keyless "generate a prompt" flow (the mockup's default).
 	Catalog      *nl.Catalog
 	Interpreter  *nl.Interpreter
@@ -89,7 +92,14 @@ func New(gen *generator.Generator, opts Options) *Server {
 		scale = 8
 	}
 	gen.SetSliceSize(opts.SliceSize)
+	if opts.Prefabs != nil {
+		gen.SetPrefabs(opts.Prefabs)
+		if opts.Catalog != nil {
+			opts.Catalog.Prefabs = opts.Prefabs
+		}
+	}
 	return &Server{
+		prefabs:     opts.Prefabs,
 		gen:         gen,
 		catalog:     opts.Catalog,
 		interp:      opts.Interpreter,
@@ -104,6 +114,8 @@ func New(gen *generator.Generator, opts Options) *Server {
 // Handler returns the HTTP handler for the whole app.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/prefabs", s.handlePrefabs)
+	mux.HandleFunc("/api/prefabs/import", s.handleImportPrefab)
 	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
 	mux.HandleFunc("/api/prompt", s.handlePrompt)
 	mux.HandleFunc("/api/describe", s.handleDescribe)
@@ -139,9 +151,10 @@ func (s *Server) Handler() http.Handler {
 // available (describe/adjust) and whether the Quit button applies.
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{
-		"prompt_enabled": s.catalog != nil,
-		"nl_enabled":     s.interp != nil,
-		"quit_enabled":   s.onQuit != nil,
+		"prompt_enabled":  s.catalog != nil,
+		"prefabs_enabled": s.prefabs != nil,
+		"nl_enabled":      s.interp != nil,
+		"quit_enabled":    s.onQuit != nil,
 	})
 }
 

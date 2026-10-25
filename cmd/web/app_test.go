@@ -30,23 +30,27 @@ func decode(t *testing.T, r response, into any) {
 }
 
 // The public site must advertise the keyless flow only: no AI on the owner's
-// key, and no Quit button.
+// key, no Quit button, and no building import (a public site must not accept
+// uploads, and the browser has no disk to keep them on).
 func TestConfigIsPublicKeylessMode(t *testing.T) {
 	r := call(handler(t), "GET", "/api/config", "")
 	var cfg map[string]bool
 	decode(t, r, &cfg)
-	if !cfg["prompt_enabled"] || cfg["nl_enabled"] || cfg["quit_enabled"] {
+	if !cfg["prompt_enabled"] || cfg["nl_enabled"] || cfg["quit_enabled"] || cfg["prefabs_enabled"] {
 		t.Errorf("config = %v, want prompt only", cfg)
 	}
 }
 
-func TestAIAndQuitAreUnavailable(t *testing.T) {
+func TestPrivateFeaturesAreUnavailable(t *testing.T) {
 	h := handler(t)
 	if r := call(h, "POST", "/api/describe", `{"description":"une forêt"}`); r.status != http.StatusServiceUnavailable {
 		t.Errorf("/api/describe = %d, want 503", r.status)
 	}
 	if r := call(h, "POST", "/api/quit", ""); r.status != http.StatusNotFound {
 		t.Errorf("/api/quit = %d, want 404", r.status)
+	}
+	if r := call(h, "POST", "/api/prefabs/import", `{"id":"x","name":"x","code":"x"}`); r.status != http.StatusServiceUnavailable {
+		t.Errorf("/api/prefabs/import = %d, want 503", r.status)
 	}
 }
 

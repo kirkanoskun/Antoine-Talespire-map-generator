@@ -53,6 +53,9 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 	for x := 0; x < w; x++ {
 		for y := 0; y < l; y++ {
 			base := colorFor(field, x, y)
+			if field.BuildingAt(x, y) {
+				base = color.RGBA{195, 142, 65, 255}
+			}
 			if !field.IsWaterAt(x, y) {
 				base = shade(base, field.HeightAt(x, y), minH, maxH)
 			}

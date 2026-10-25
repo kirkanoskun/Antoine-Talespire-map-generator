@@ -18,8 +18,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	talespire "github.com/kirkanoskun/antoine-talespire-map-generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/preview"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
@@ -34,7 +36,16 @@ func main() {
 	seed := flag.Int64("seed", 1, "random seed for reproducible generation")
 	transition := flag.Int("transition", 3, "zone-border stitching half-width in tiles (0 = hard borders)")
 	slice := flag.Int("slice", 0, "slice the map into slabs of at most N tiles per side (0 = single slab)")
+	prefabsPath := flag.String("prefabs", "", "optional external prefab catalogue instead of the embedded catalogue")
 	flag.Parse()
+	builtin := talespire.PrefabCatalog()
+	if *prefabsPath != "" {
+		builtin = nil
+	}
+	prefabs, err := prefab.Open(*prefabsPath, builtin)
+	if err != nil {
+		log.Fatalf("loading prefabs: %v", err)
+	}
 
 	if *input == "" {
 		flag.Usage()
@@ -56,6 +67,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialising generator: %v", err)
 	}
+	gen.SetPrefabs(prefabs)
 	gen.SetTransitionHalfWidth(*transition)
 	gen.SetSliceSize(*slice)
 	res, err := gen.Generate(doc, mask, *seed)

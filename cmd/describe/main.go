@@ -22,8 +22,10 @@ import (
 
 	"github.com/joho/godotenv"
 
+	talespire "github.com/kirkanoskun/antoine-talespire-map-generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/preview"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
@@ -48,7 +50,16 @@ func main() {
 	scale := flag.Int("scale", 8, "preview pixels per tile")
 	seed := flag.Int64("seed", 1, "generation seed")
 	transition := flag.Int("transition", 3, "zone-border stitching half-width in tiles (0 = hard borders)")
+	prefabsPath := flag.String("prefabs", "", "optional external prefab catalogue instead of the embedded catalogue")
 	flag.Parse()
+	builtin := talespire.PrefabCatalog()
+	if *prefabsPath != "" {
+		builtin = nil
+	}
+	prefabs, err := prefab.Open(*prefabsPath, builtin)
+	if err != nil {
+		log.Fatalf("loading prefabs: %v", err)
+	}
 
 	desc := *description
 	if *descFile != "" {
@@ -68,6 +79,7 @@ func main() {
 		log.Fatalf("loading catalog: %v", err)
 	}
 
+	catalog.Prefabs = prefabs
 	interpreter := nl.NewInterpreter(
 		nl.NewAnthropicCompleter(nl.AnthropicConfig{Model: *model}),
 		catalog,
@@ -110,6 +122,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialising generator: %v", err)
 	}
+	gen.SetPrefabs(prefabs)
 	gen.SetTransitionHalfWidth(*transition)
 	gres, err := gen.Generate(res.IR, mask, *seed)
 	if err != nil {

@@ -349,12 +349,12 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 ### Community slab import — findings, not code
 
 Importing real player-made buildings (Tales Tavern / TalesBazaar) is implemented
-on the `codex/slab-importer` branch (`internal/slab`, `internal/prefab`,
-`cmd/import-slab`). A parallel exploration lived here (`internal/chimera`,
-`internal/buildings`, `cmd/composemap`, `cmd/slabdecode`) and was removed to
-avoid two implementations of the same thing. What that exploration *established*
-is kept below, because it was paid for in in-game trial and error and the
-surviving implementation still needs some of it.
+by `internal/slab`, `internal/prefab` and `cmd/import-slab` (see "Community
+prefab import" below). A parallel exploration (`internal/chimera`,
+`internal/buildings`, `cmd/composemap`, `cmd/slabdecode`) was removed to avoid
+two implementations of the same thing. What that exploration *established*
+is kept below, because it was paid for in in-game trial and error; the
+importer now applies the seating rule and the provenance rule.
 
 - **The packed position layout.** TaleSpire packs each placement as a 64-bit
   little-endian blob with 18-bit fields: horizontal-A @0, vertical @18,
@@ -398,3 +398,33 @@ surviving implementation still needs some of it.
   output path.
 - Validate the IR at the boundary (`ir.Parse`) — fail loudly, never panic deep
   in generation.
+
+### Community prefab import
+
+`internal/slab` implements the Bouncy Rock documented v2 packed binary format,
+keeping hundredth-unit coordinates, per-asset rotations and extra bits.
+`internal/prefab` validates and persists portable entries. `cmd/import-slab`
+adds a code to `configs/prefabs.json`, which is embedded in new builds.
+The server also keeps user imports in `~/.talespire/prefabs.json`.
+`buildings` is a top-level IR array of `{prefab, position:{x,y}, rotation}`;
+position is the north-west corner of the reserved footprint. Only catalogue IDs
+are permitted. No base64 goes into model instructions. Unknown IDs, overlapping
+footprints, water and out-of-map placements fail explicitly. See
+`docs/slab-importer.md` for the conversation workflow and physical bounds limits.
+
+- **Seated by ground level.** Each prefab carries `ground_y` (Slab units above
+  its lowest piece): the busiest level by default, overridable per building
+  (`-ground`, `ground_y`). `placeBuildings` works in two passes — reserve and
+  level every footprint, then emit — so it can align each ground level with
+  the surface `(height+1)*50`, raise the whole scene by whole steps when a
+  cellar would go below zero, and mark the tiles under buried pieces as dug
+  (`HeightField.dug`); `placeGround` skips them *after* drawing their block, so
+  digging leaves the RNG sequence and the rest of the map unchanged.
+- **Licence before redistribution.** `prefab.CheckProvenance` requires a licence
+  (plus the author for any CC "BY" licence) on every built-in entry —
+  `prefab.Open` refuses built-ins without one, so `TestEmbeddedPrefabCatalogue`
+  fails in CI — and `cmd/import-slab`, which writes the repository catalogue,
+  enforces it too. Local imports (`~/.talespire/prefabs.json`, the desktop UI)
+  are not redistributed and stay free.
+- **Desktop only.** The public website wires no prefab store, so the import
+  panel stays hidden there (`prefabs_enabled:false`).
