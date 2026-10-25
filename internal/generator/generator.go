@@ -136,6 +136,7 @@ type HeightField struct {
 	Length    int
 	tiles     [][]tile
 	buildings [][]bool
+	dug       [][]bool // ground removed under a building's underground part
 }
 
 // HeightAt returns the terrain height at (x,y).
@@ -389,7 +390,9 @@ func (g *Generator) placeGround(out []placement, biome *taleslabentities.Biome, 
 		for y := 0; y < f.Length; y++ {
 			t := f.tiles[x][y]
 			block := g.buildingBlock(biome, t.relief, rng)
-			if block == nil {
+			// A dug tile still draws its block, so digging a cellar leaves the
+			// random sequence — and so the rest of the map — unchanged.
+			if block == nil || f.dugAt(x, y) {
 				continue
 			}
 

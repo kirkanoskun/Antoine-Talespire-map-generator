@@ -189,6 +189,7 @@
         <div><label for="prefabName">Nom</label><input id="prefabName" placeholder="Auberge en pierre" maxlength="160"></div>
         <div><label for="prefabAuthor">Créateur (facultatif)</label><input id="prefabAuthor" maxlength="200"></div>
         <div><label for="prefabSource">Lien source (facultatif)</label><input id="prefabSource" type="url" maxlength="2000"></div>
+        <div><label for="prefabLicense">Licence (facultatif)</label><input id="prefabLicense" placeholder="CC BY-NC 4.0" maxlength="200"></div>
         <div><label for="prefabWidth">Largeur réservée (facultatif)</label><input id="prefabWidth" type="number" min="2" max="200" placeholder="Automatique"></div>
         <div><label for="prefabLength">Longueur réservée (facultatif)</label><input id="prefabLength" type="number" min="2" max="200" placeholder="Automatique"></div>
       </div>
@@ -329,7 +330,9 @@ async function refreshPrefabs(){
   $('prefabsList').replaceChildren();
   for (const item of items) {
     const li = document.createElement('li');
-    li.textContent = `${item.name} (${item.id}), ${item.width} × ${item.length} tuiles réservées, ${item.asset_count} objets`;
+    // ground_y is in Slab units (50 per terrain step) above the lowest piece.
+    const buried = item.ground_y > 0 ? `, rez-de-chaussée à ${item.ground_y / 50} paliers au-dessus des fondations` : '';
+    li.textContent = `${item.name} (${item.id}), ${item.width} × ${item.length} tuiles réservées, ${item.asset_count} objets${buried}${item.license ? ', licence ' + item.license : ''}`;
     $('prefabsList').appendChild(li);
   }
   if (!items.length) $('prefabsList').textContent = 'Aucun bâtiment importé pour le moment.';
@@ -337,7 +340,7 @@ async function refreshPrefabs(){
 $('importPrefab').onclick = async () => {
   $('importPrefab').disabled = true; $('prefabStatus').textContent = 'Vérification du Slab…';
   try {
-    const entry = {id:$('prefabID').value.trim(), name:$('prefabName').value.trim() || $('prefabID').value.trim(), code:$('prefabCode').value, author:$('prefabAuthor').value.trim(), source_url:$('prefabSource').value.trim(), width:Number($('prefabWidth').value), length:Number($('prefabLength').value)};
+    const entry = {id:$('prefabID').value.trim(), name:$('prefabName').value.trim() || $('prefabID').value.trim(), code:$('prefabCode').value, author:$('prefabAuthor').value.trim(), source_url:$('prefabSource').value.trim(), license:$('prefabLicense').value.trim(), width:Number($('prefabWidth').value), length:Number($('prefabLength').value)};
     const item = await postJSON('/api/prefabs/import', entry);
     $('prefabCode').value = '';
     $('prefabStatus').textContent = `${item.name} enregistré. Vous pouvez le demander dans votre description.`;

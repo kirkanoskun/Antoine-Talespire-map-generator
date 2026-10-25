@@ -20,15 +20,22 @@ import (
 
 // Entry is the portable on-disk format. Code is never sent to the language model.
 // Footprint overrides are in map tiles, including the one-tile safety margin.
+//
+// GroundY overrides the detected ground level: the height of the floor to seat
+// on the terrain, in Slab units (hundredths of a game unit; a terrain step is
+// 50) above the building's lowest piece. Leave it unset to use the busiest
+// level, which for a building is almost always its ground floor.
 type Entry struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Code        string `json:"code"`
 	Author      string `json:"author,omitempty"`
 	SourceURL   string `json:"source_url,omitempty"`
+	License     string `json:"license,omitempty"`
 	Description string `json:"description,omitempty"`
 	Width       int    `json:"width,omitempty"`
 	Length      int    `json:"length,omitempty"`
+	GroundY     *int   `json:"ground_y,omitempty"`
 }
 
 type Info struct {
@@ -36,11 +43,15 @@ type Info struct {
 	Name        string `json:"name"`
 	Author      string `json:"author,omitempty"`
 	SourceURL   string `json:"source_url,omitempty"`
+	License     string `json:"license,omitempty"`
 	Description string `json:"description,omitempty"`
 	Width       int    `json:"width"`
 	Length      int    `json:"length"`
-	AssetCount  int    `json:"asset_count"`
-	SHA256      string `json:"sha256"`
+	// GroundY is the resolved ground level, in Slab units above the lowest
+	// piece; anything below it (cellar, footings) ends up buried.
+	GroundY    int    `json:"ground_y"`
+	AssetCount int    `json:"asset_count"`
+	SHA256     string `json:"sha256"`
 }
 
 type Building struct {
@@ -58,7 +69,7 @@ func Validate(e Entry) (*Building, error) {
 	if strings.TrimSpace(e.Name) == "" || len(e.Name) > 160 {
 		return nil, fmt.Errorf("name is required (max 160 bytes)")
 	}
-	if len(e.Author) > 200 || len(e.SourceURL) > 2000 || len(e.Description) > 2000 {
+	if len(e.Author) > 200 || len(e.SourceURL) > 2000 || len(e.License) > 200 || len(e.Description) > 2000 {
 		return nil, fmt.Errorf("Slab metadata is too long")
 	}
 	s, err := slab.Decode(e.Code)
@@ -69,13 +80,14 @@ func Validate(e Entry) (*Building, error) {
 		return nil, fmt.Errorf("Slab contains no assets")
 	}
 	minX, minY, minZ := slab.MaxCoordinate, slab.MaxCoordinate, slab.MaxCoordinate
-	maxX, maxZ := 0, 0
+	maxX, maxY, maxZ := 0, 0, 0
 	for _, l := range s.Layouts {
 		for _, p := range l.Instances {
 			minX = min(minX, p.X)
 			minY = min(minY, p.Y)
 			minZ = min(minZ, p.Z)
 			maxX = max(maxX, p.X)
+			maxY = max(maxY, p.Y)
 			maxZ = max(maxZ, p.Z)
 		}
 	}
@@ -88,6 +100,13 @@ func Validate(e Entry) (*Building, error) {
 		}
 	}
 	spanX, spanZ := maxX-minX, maxZ-minZ
+	ground := busiestLevel(s)
+	if e.GroundY != nil {
+		if *e.GroundY < 0 || *e.GroundY > maxY-minY {
+			return nil, fmt.Errorf("ground_y must be between 0 and %d (the building's height above its lowest piece)", maxY-minY)
+		}
+		ground = *e.GroundY
+	}
 	width, length := (spanX+99)/100+2, (spanZ+99)/100+2
 	if e.Width != 0 {
 		if e.Width < width {
@@ -109,7 +128,47 @@ func Validate(e Entry) (*Building, error) {
 		return nil, err
 	}
 	hash := sha256.Sum256([]byte(normalized))
-	return &Building{Info: Info{ID: e.ID, Name: e.Name, Author: e.Author, SourceURL: e.SourceURL, Description: e.Description, Width: width, Length: length, AssetCount: s.Count(), SHA256: hex.EncodeToString(hash[:])}, Slab: s, SpanX: spanX, SpanZ: spanZ}, nil
+	return &Building{Info: Info{ID: e.ID, Name: e.Name, Author: e.Author, SourceURL: e.SourceURL, License: e.License, Description: e.Description, Width: width, Length: length, GroundY: ground, AssetCount: s.Count(), SHA256: hex.EncodeToString(hash[:])}, Slab: s, SpanX: spanX, SpanZ: spanZ}, nil
+}
+
+// busiestLevel returns the (normalized) height holding the most pieces — for a
+// building, almost always its ground floor — preferring the lowest on a tie.
+// Seating a build by this level rather than by its lowest piece keeps a cellar
+// or footings underground instead of lifting the whole build into the air.
+func busiestLevel(s *slab.Slab) int {
+	counts := map[int]int{}
+	for _, l := range s.Layouts {
+		for _, p := range l.Instances {
+			counts[p.Y]++
+		}
+	}
+	best, bestCount := 0, -1
+	for y, n := range counts {
+		if n > bestCount || (n == bestCount && y < best) {
+			best, bestCount = y, n
+		}
+	}
+	return best
+}
+
+// CheckProvenance enforces what an entry needs before it is redistributed in
+// the repository or the built app: community builds belong to their creators,
+// under their own terms, so the licence must be recorded — and the author too
+// when the licence requires attribution (any Creative Commons "BY" licence).
+// Imports kept on the user's own machine are not redistributed and skip this.
+func CheckProvenance(e Entry) error {
+	if strings.TrimSpace(e.License) == "" {
+		return fmt.Errorf("prefab %q: a licence is required for a redistributed building (e.g. \"CC BY-NC 4.0\", or the creator's explicit permission)", e.ID)
+	}
+	if requiresAttribution(e.License) && strings.TrimSpace(e.Author) == "" {
+		return fmt.Errorf("prefab %q: licence %q requires attribution, so the author is required", e.ID, e.License)
+	}
+	return nil
+}
+
+func requiresAttribution(license string) bool {
+	upper := strings.ToUpper(license)
+	return strings.Contains(upper, "BY")
 }
 
 // Store owns validated immutable buildings. All returned Buildings are copies.
@@ -145,6 +204,11 @@ func Open(path string, builtins []byte) (*Store, error) {
 			}
 		} else if !os.IsNotExist(err) {
 			return nil, err
+		}
+	}
+	for _, e := range base {
+		if err := CheckProvenance(e); err != nil {
+			return nil, fmt.Errorf("built-in prefabs: %w", err)
 		}
 	}
 	for _, list := range [][]Entry{base, local} {
