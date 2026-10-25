@@ -134,12 +134,15 @@ What taleslab does **not** do, and is the real subject of this project:
 cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
 cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
 cmd/server/           HTTP server for the web UI
+cmd/web/              the same API compiled to WebAssembly, for the public website
+web/                  the browser bridge (cartographe.js) and response headers
 internal/ir/          IR types, strict JSON parsing & validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
 internal/generator/   zone-aware slab generation, stitching, paths, mapper
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry, Adjust
 internal/server/      HTTP API + embedded single-page UI, in-memory sessions
+internal/catalogs/    biome/prop catalogues parsed from bytes (no filesystem)
 configs/              biomes.json, props.json (copied from taleslab)
 testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
@@ -221,6 +224,14 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   brief's "re-run only affected zones" is unnecessary for compute; the value of
   keeping the IR is that edits are *relative to the current map*, not a fresh
   description. The `/api/generate` path also lets the UI apply hand-edited IR.
+- **Keyless prompt is interactive (v1.03).** `nl.BuildPrompt` (the "Générer le
+  prompt" button) opens with a `# Before anything else: ask 3 clarifying questions`
+  section (density/mood, focal point, circulation) and a relaxed output contract:
+  the assistant asks the three questions and waits before emitting JSON (or skips
+  if told to). This is added only in the interactive prompt — `systemPrompt(false)`
+  used by the automated `/api/describe` path stays single-shot JSON, since its
+  reply must satisfy the validate/retry loop. `nl.PromptVersion` carries the
+  wording revision and is printed at the top of the generated prompt.
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.
@@ -234,6 +245,62 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   GUI app inherits no shell env). `scripts/build-{mac,windows}.sh` produce a
   `.app` bundle and a no-console `.exe`. The generation logic is untouched — this
   is packaging only.
+- **Branding.** The macOS app is named "Le Cartographe, a TaleSpire Map
+  Generator" (menu-bar name "Le Cartographe"), with the compass/mountains logo
+  as its icon. The `.icns` is committed at `assets/icon.icns` and generated from
+  `assets/logo.png` by `scripts/make-icns.py` (Pillow, no Xcode Command Line
+  Tools needed); `build-mac.sh` copies it into the bundle and sets
+  `CFBundleIconFile` (still builds without it). The same logo lives in the web UI
+  — the emblem in the header mark and the full badge as the landing hero —
+  served from `internal/server/static/` via the `/static/` route.
+- **macOS build is host-arch by default.** `build-mac.sh` detects the host
+  architecture (`uname -m`) and builds only that, so it needs nothing but the Go
+  toolchain (no `lipo`/Command Line Tools). `--universal` still fuses an
+  Intel+Apple-Silicon binary when `lipo` is available.
+
+### Public website (Cloudflare Workers static assets)
+
+- **Static site, engine in the browser.** The site needs no server: `cmd/web`
+  compiles the desktop app's own `internal/server` handler to WebAssembly, and
+  `web/cartographe.js` overrides `window.fetch` so the unchanged UI's `/api/*`
+  calls run in-process. JSON replies carrying a `preview_url` get it swapped for
+  a blob URL, since the UI shows the preview through `<img src>`, which never
+  goes through fetch. `scripts/build-web.sh` assembles `dist/web` — the desktop
+  `index.html` with the two engine scripts injected before the UI's script.
+- **Keyless by design.** The site is public: no `Interpreter` (the AI would run
+  on the owner's key for every visitor) and no `OnQuit`, so `/api/config`
+  reports prompt-only and the UI hides the rest. Everything else uses the
+  desktop app's defaults; `TestWebMatchesDesktopOutput` holds the two to
+  byte-identical codes.
+- **No filesystem in the browser.** taleslab only loads catalogues from a path,
+  so `internal/catalogs` parses them from bytes (held to taleslab's loaders by a
+  `reflect.DeepEqual` parity test), and `generator.NewFromJSON` /
+  `nl.NewCatalog` take the embedded bytes (`talespire.BiomesJSON/PropsJSON`).
+  The desktop and CLI paths are untouched.
+- **A panic costs one request, not the visit.** `net/http` recovers panicking
+  handlers; a direct `ServeHTTP` call does not, and in the browser a panic would
+  kill the engine for the rest of the session. `cmd/web`'s `call` recovers and
+  answers with the server's own `{"error": …}` shape.
+- **No third-party requests, and a legal notice that says so.** Fonts are
+  self-hosted (`static/fonts/`, Fontsource latin subset, OFL licences alongside)
+  instead of Google Fonts, which hands every visitor's IP to Google — a GDPR
+  problem for a public French site. `static/mentions-legales.html` (LCEN legal
+  notice, linked from the footer, served on desktop and web alike) states that
+  nothing is collected or loaded from third parties;
+  `TestPagesLoadOnlyTheirOwnResources` keeps that true. Adding analytics or any
+  external service means updating that page.
+- **Testing in the real runtime.** `cmd/web` tests run natively *and* compiled
+  to wasm under Node (`GOOS=js GOARCH=wasm go test`, with `env -i`: Go's
+  `wasm_exec` refuses an environment over ~12 kB). The **Website** workflow
+  does both, then deploys with `wrangler deploy` when the
+  `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets exist. Setup guide:
+  `docs/site-web.md`.
+- **Hosted as an assets-only Worker, not Pages.** Cloudflare's dashboard now
+  labels Pages "legacy", so `wrangler.jsonc` declares an assets-only Worker
+  (no script): free and unlimited on the Free plan, since no Worker code runs.
+  `wrangler dev` runs the real workerd runtime locally — the Chromium journey
+  passes on it. Keep the default `html_handling`: `"none"` would spare the
+  legal page's one `.html` → extension-less redirect, but makes `/` a 404.
 
 ### Phase 3 stitching notes
 
@@ -278,6 +345,50 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   still worth watching; the system prompt is cache-marked to reduce cost.
 - TaleSpire's max slab size — RESOLVED: ~30 kB per slab, slicing implemented.
   The one remaining unautomatable step is importing a code into a real client.
+
+### Community slab import — findings, not code
+
+Importing real player-made buildings (Tales Tavern / TalesBazaar) is implemented
+by `internal/slab`, `internal/prefab` and `cmd/import-slab` (see "Community
+prefab import" below). A parallel exploration (`internal/chimera`,
+`internal/buildings`, `cmd/composemap`, `cmd/slabdecode`) was removed to avoid
+two implementations of the same thing. What that exploration *established*
+is kept below, because it was paid for in in-game trial and error and the
+surviving implementation still needs some of it.
+
+- **The packed position layout.** TaleSpire packs each placement as a 64-bit
+  little-endian blob with 18-bit fields: horizontal-A @0, vertical @18,
+  horizontal-B @36, then rotation in 15° steps @54. `talescoder` v1.0.5 (latest)
+  reads byte-aligned 16-bit fields instead, so one horizontal axis is 4 bits off
+  and its high bits leak into "rotation". It is only accidentally right for
+  grid-snapped tiles, which is why a community building's floor decoded fine but
+  its offset pieces ran to impossible coordinates (0..1009 tiles). Confirmed
+  against LuPro/SlabelFish and against Bouncy Rock's own `format.md`.
+- **VALIDATED on a real community slab** ("Smiling Goat Inn", 318 distinct
+  assets / 5449 placements): a coherent ~30×37 footprint 17 tiles tall where
+  talescoder gave 1009. Two independent confirmations fell out of the same data:
+  rotations decode as exactly 24 distinct steps of 15° (none off the step), and
+  the horizontal axes sit on a clean 100-unit lattice.
+- **Scale: 100 units per tile horizontally, 50 per step vertically** (a vertical
+  step is half a tile). Settled by round-tripping the generator's own output — a
+  map at height 1 encodes to 50, and a 6-tile map to 0,100,…,500 — and
+  consistent with the community slab, whose floors sit 400 units (8 steps) apart.
+- **Seating rule (learned the hard way, in game).** Align the building's
+  **ground level** with the terrain surface — *not* its lowest piece. Builds
+  often carry a cellar or footings meant to end up buried; anchoring the bottom
+  shoves the whole thing into the air (the Smiling Goat Inn has 8.5 steps below
+  its ground floor, and floated by exactly that). The ground level defaults well
+  to the slab's busiest level, which is almost always the ground floor, but must
+  be overridable per building. Since TaleSpire has no negative Z, raise the whole
+  scene when the buried part needs the room, and drop the map's own ground on the
+  tiles where the build digs in.
+- **Sizing reality.** A whole map plus a whole building does not fit TaleSpire's
+  ~30 kB slab limit — the inn alone is 39 kB — so slicing is the normal path, not
+  a fallback. A building kept whole inside one slice caps how small that slice
+  can get.
+- **Provenance is not optional.** Community builds carry per-creator licences
+  (several are CC BY-NC). Any catalogue that ships in the repo or in the binary
+  needs a licence field recorded per entry.
 
 ## Conventions
 

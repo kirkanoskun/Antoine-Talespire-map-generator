@@ -1,6 +1,7 @@
 # Build output
 /out/
 /dist/
+/.wrangler/
 *.exe
 # Stray dev binaries from `go build` in the repo root.
 /server
@@ -17,3 +18,7 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Local library of community buildings (other players' work, each under its own
+# licence). Never commit it: the repository is public.
+/buildings/

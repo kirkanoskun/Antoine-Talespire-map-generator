@@ -113,7 +113,9 @@ func (in *Interpreter) Adjust(ctx context.Context, current *ir.IR, message strin
 
 // run executes the validate-and-retry loop over a seeded conversation.
 func (in *Interpreter) run(ctx context.Context, messages []Message, opts Options) (*Result, error) {
-	system := in.catalog.systemPrompt()
+	// Non-interactive: the API path is a single-shot call whose response must be
+	// JSON for the validate loop, so it never asks clarifying questions.
+	system := in.catalog.systemPrompt(false)
 	res := &Result{}
 	for attempt := 0; attempt <= opts.MaxRetries; attempt++ {
 		raw, err := in.completer.Complete(ctx, system, messages)

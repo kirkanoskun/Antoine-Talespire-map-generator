@@ -13,6 +13,23 @@ import (
 //go:embed configs/biomes.json configs/props.json configs/prefabs.json
 var configsFS embed.FS
 
+// BiomesJSON returns the embedded biomes.json, for builds without a
+// filesystem (the browser build, see cmd/web).
+func BiomesJSON() []byte { return mustRead("configs/biomes.json") }
+
+// PropsJSON returns the embedded props.json.
+func PropsJSON() []byte { return mustRead("configs/props.json") }
+
+// mustRead panics on a missing embedded file: that is a build defect, caught
+// by the go:embed directive itself rather than at run time.
+func mustRead(name string) []byte {
+	data, err := configsFS.ReadFile(name)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
 // WriteConfigs materializes the embedded biome/prop catalogues into a fresh
 // temporary directory and returns their paths plus a cleanup function. The
 // generator and NL catalogue loaders take file paths (taleslab reads configs

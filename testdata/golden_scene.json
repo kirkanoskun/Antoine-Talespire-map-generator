@@ -1,0 +1,9 @@
+{
+  "map": {"width": 18, "length": 18, "name": "golden", "biome": "temperate_forest"},
+  "zones": [
+    {"id": "forest", "anchor": {"x": 6, "y": 9}, "relative_size": 0.6, "elevation": "flat",
+     "density_overrides": {"vegetation": 0.5, "misc": 0.2}},
+    {"id": "ruins", "anchor": {"x": 13, "y": 9}, "relative_size": 0.4, "elevation": "flat",
+     "relief_override": "ruins", "density_overrides": {"misc": 0.5, "stones": 0.4}}
+  ]
+}
