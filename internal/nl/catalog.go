@@ -11,7 +11,10 @@ import (
 	"fmt"
 	"sort"
 
+	domainrepos "github.com/johnfercher/taleslab/pkg/taleslab/taleslabdomain/taleslabrepositories"
 	"github.com/johnfercher/taleslab/pkg/taleslab/taleslabrepositories"
+
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/catalogs"
 )
 
 // Catalog is the set of engine facts the model must respect: the biomes it may
@@ -33,6 +36,20 @@ func LoadCatalog(biomesPath string, poiNames []string) (*Catalog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading biomes: %w", err)
 	}
+	return newCatalog(repo, poiNames), nil
+}
+
+// NewCatalog is LoadCatalog for a biomes.json already in memory (the browser
+// build has no filesystem).
+func NewCatalog(biomesJSON []byte, poiNames []string) (*Catalog, error) {
+	repo, err := catalogs.ParseBiomes(biomesJSON)
+	if err != nil {
+		return nil, err
+	}
+	return newCatalog(repo, poiNames), nil
+}
+
+func newCatalog(repo domainrepos.BiomeRepository, poiNames []string) *Catalog {
 	biomes := map[string][]string{}
 	for biomeType, biome := range repo.GetBiomes() {
 		reliefs := make([]string, 0, len(biome.Reliefs))
@@ -44,7 +61,7 @@ func LoadCatalog(biomesPath string, poiNames []string) (*Catalog, error) {
 	}
 	names := append([]string(nil), poiNames...)
 	sort.Strings(names)
-	return &Catalog{Biomes: biomes, POINames: names}, nil
+	return &Catalog{Biomes: biomes, POINames: names}
 }
 
 // biomeNames returns the sorted biome ids.

@@ -22,6 +22,7 @@ import (
 	domainrepos "github.com/johnfercher/taleslab/pkg/taleslab/taleslabdomain/taleslabrepositories"
 	"github.com/johnfercher/taleslab/pkg/taleslab/taleslabrepositories"
 
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/catalogs"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
@@ -63,13 +64,31 @@ func New(biomesPath, propsPath string) (*Generator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading props: %w", err)
 	}
+	return newGenerator(biomes, props), nil
+}
+
+// NewFromJSON is New for catalogues already in memory: the browser build has
+// no filesystem to load them from.
+func NewFromJSON(biomesJSON, propsJSON []byte) (*Generator, error) {
+	biomes, err := catalogs.ParseBiomes(biomesJSON)
+	if err != nil {
+		return nil, err
+	}
+	props, err := catalogs.ParseProps(propsJSON)
+	if err != nil {
+		return nil, err
+	}
+	return newGenerator(biomes, props), nil
+}
+
+func newGenerator(biomes domainrepos.BiomeRepository, props domainrepos.PropRepository) *Generator {
 	return &Generator{
 		biomes:          biomes,
 		props:           props,
 		enc:             encoder.NewEncoder(),
 		transitionHalf:  defaultTransitionHalfWidth,
 		smoothingPasses: 2,
-	}, nil
+	}
 }
 
 // SetTransitionHalfWidth sets the zone-border stitching band half-width in

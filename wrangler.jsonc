@@ -1,0 +1,15 @@
+// Cloudflare Workers configuration for the public website: an assets-only
+// Worker serving the static site built by scripts/build-web.sh. No Worker code
+// runs — the map engine runs in the visitor's browser — so requests are free and
+// unlimited on the Free plan. Deployed by .github/workflows/web.yml; the custom
+// domain is attached once in the dashboard (docs/site-web.md).
+{
+  "name": "le-cartographe",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    // Default html_handling: "/" serves index.html, and links ending in .html
+    // (the legal page) redirect once to the extension-less URL. "none" would
+    // avoid that redirect but makes "/" a 404.
+    "directory": "./dist/web"
+  }
+}

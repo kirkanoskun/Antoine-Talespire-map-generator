@@ -1,0 +1,27 @@
+/* Self-hosted fonts (latin subset, which covers French), so no page asks
+   Google's servers for anything. Files from Fontsource 5.3.0; both families
+   are under the SIL Open Font License 1.1, see the OFL-*.txt files here. */
+@font-face {
+  font-family: 'Cinzel'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url(/static/fonts/cinzel-latin-500-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Cinzel'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url(/static/fonts/cinzel-latin-600-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Cinzel'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url(/static/fonts/cinzel-latin-700-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Work Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url(/static/fonts/work-sans-latin-400-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Work Sans'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url(/static/fonts/work-sans-latin-500-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Work Sans'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url(/static/fonts/work-sans-latin-600-normal.woff2) format('woff2');
+}

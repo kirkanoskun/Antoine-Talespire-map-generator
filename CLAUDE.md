@@ -134,12 +134,15 @@ What taleslab does **not** do, and is the real subject of this project:
 cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
 cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
 cmd/server/           HTTP server for the web UI
+cmd/web/              the same API compiled to WebAssembly, for the public website
+web/                  the browser bridge (cartographe.js) and response headers
 internal/ir/          IR types, strict JSON parsing & validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
 internal/generator/   zone-aware slab generation, stitching, paths, mapper
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry, Adjust
 internal/server/      HTTP API + embedded single-page UI, in-memory sessions
+internal/catalogs/    biome/prop catalogues parsed from bytes (no filesystem)
 configs/              biomes.json, props.json (copied from taleslab)
 testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
@@ -254,6 +257,50 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   architecture (`uname -m`) and builds only that, so it needs nothing but the Go
   toolchain (no `lipo`/Command Line Tools). `--universal` still fuses an
   Intel+Apple-Silicon binary when `lipo` is available.
+
+### Public website (Cloudflare Workers static assets)
+
+- **Static site, engine in the browser.** The site needs no server: `cmd/web`
+  compiles the desktop app's own `internal/server` handler to WebAssembly, and
+  `web/cartographe.js` overrides `window.fetch` so the unchanged UI's `/api/*`
+  calls run in-process. JSON replies carrying a `preview_url` get it swapped for
+  a blob URL, since the UI shows the preview through `<img src>`, which never
+  goes through fetch. `scripts/build-web.sh` assembles `dist/web` — the desktop
+  `index.html` with the two engine scripts injected before the UI's script.
+- **Keyless by design.** The site is public: no `Interpreter` (the AI would run
+  on the owner's key for every visitor) and no `OnQuit`, so `/api/config`
+  reports prompt-only and the UI hides the rest. Everything else uses the
+  desktop app's defaults; `TestWebMatchesDesktopOutput` holds the two to
+  byte-identical codes.
+- **No filesystem in the browser.** taleslab only loads catalogues from a path,
+  so `internal/catalogs` parses them from bytes (held to taleslab's loaders by a
+  `reflect.DeepEqual` parity test), and `generator.NewFromJSON` /
+  `nl.NewCatalog` take the embedded bytes (`talespire.BiomesJSON/PropsJSON`).
+  The desktop and CLI paths are untouched.
+- **A panic costs one request, not the visit.** `net/http` recovers panicking
+  handlers; a direct `ServeHTTP` call does not, and in the browser a panic would
+  kill the engine for the rest of the session. `cmd/web`'s `call` recovers and
+  answers with the server's own `{"error": …}` shape.
+- **No third-party requests, and a legal notice that says so.** Fonts are
+  self-hosted (`static/fonts/`, Fontsource latin subset, OFL licences alongside)
+  instead of Google Fonts, which hands every visitor's IP to Google — a GDPR
+  problem for a public French site. `static/mentions-legales.html` (LCEN legal
+  notice, linked from the footer, served on desktop and web alike) states that
+  nothing is collected or loaded from third parties;
+  `TestPagesLoadOnlyTheirOwnResources` keeps that true. Adding analytics or any
+  external service means updating that page.
+- **Testing in the real runtime.** `cmd/web` tests run natively *and* compiled
+  to wasm under Node (`GOOS=js GOARCH=wasm go test`, with `env -i`: Go's
+  `wasm_exec` refuses an environment over ~12 kB). The **Website** workflow
+  does both, then deploys with `wrangler deploy` when the
+  `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets exist. Setup guide:
+  `docs/site-web.md`.
+- **Hosted as an assets-only Worker, not Pages.** Cloudflare's dashboard now
+  labels Pages "legacy", so `wrangler.jsonc` declares an assets-only Worker
+  (no script): free and unlimited on the Free plan, since no Worker code runs.
+  `wrangler dev` runs the real workerd runtime locally — the Chromium journey
+  passes on it. Keep the default `html_handling`: `"none"` would spare the
+  legal page's one `.html` → extension-less redirect, but makes `/` a 404.
 
 ### Phase 3 stitching notes
 
