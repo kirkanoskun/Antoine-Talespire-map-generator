@@ -143,11 +143,17 @@ func (c *Catalog) BuildPrompt(description string, opts Options) string {
 	if opts.Length <= 0 {
 		opts.Length = 50
 	}
+	return c.PromptHead() + userPrompt(description, opts.Width, opts.Length, opts.Name, opts.ForcedBiome)
+}
+
+// PromptHead is the part of BuildPrompt that does not depend on the scene: the
+// version line, the instructions and the catalogue. The website ships it as a
+// file so a prompt can be assembled before its engine has finished loading.
+func (c *Catalog) PromptHead() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "TaleSpire IR prompt — version %s\n\n", PromptVersion)
 	b.WriteString(c.systemPrompt(true))
 	b.WriteString("\n\n=====\n\n")
-	b.WriteString(userPrompt(description, opts.Width, opts.Length, opts.Name, opts.ForcedBiome))
 	return b.String()
 }
 

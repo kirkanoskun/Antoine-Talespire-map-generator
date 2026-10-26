@@ -82,6 +82,14 @@
   button.large{padding:14px 26px; font-size:16px}
 
   .eyebrow{font-size:13px; color:var(--muted); margin:36px 0 12px}
+  /* Step 1: the form, and beside it an example of what comes out. */
+  .landing{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:40px; align-items:start}
+  .sample{margin:26px 0 0}
+  .sample img{display:block; width:100%; height:auto; image-rendering:pixelated; border:1px solid var(--control);
+    outline:1px solid var(--border); outline-offset:4px}
+  .sample figcaption{margin-top:14px; font-size:14px; color:var(--muted)}
+  .sample figcaption b{display:block; color:var(--ink); font-weight:600; margin-bottom:2px}
+  @media(max-width:860px){ .landing{grid-template-columns:1fr; gap:8px} .sample{max-width:300px} }
   .chips{display:flex; flex-wrap:wrap; gap:8px}
   .chip{background:var(--panel); border:1px solid var(--border); color:var(--ink); border-radius:999px;
     padding:8px 14px; cursor:pointer; text-align:left; font-size:14px;
@@ -239,69 +247,79 @@
     <h2 class="title" id="t1" tabindex="-1">Décrivez la carte que vous imaginez</h2>
     <p class="lead">Racontez la scène comme à votre table : le décor, l’ambiance, les éléments clés. Le Cartographe prépare un prompt pour votre assistant IA, puis transforme sa réponse en carte TaleSpire.</p>
 
-    <label for="desc">Votre scène</label>
-    <textarea id="desc" aria-describedby="descErr" aria-keyshortcuts="Control+Enter Meta+Enter"
-      placeholder="Ex. Une cour de château en ruines, une mare au sud, des vestiges au nord…"></textarea>
-    <div class="err" id="descErr" role="alert" hidden></div>
-    <p class="note" id="undoWrap"><button class="link" id="undoExample" hidden>Exemple appliqué. Rétablir mon texte</button><button class="link" id="undoRestart" hidden>Carte effacée. La rétablir</button></p>
+    <div class="landing">
+      <div class="landing-main">
+      <label for="desc">Votre scène</label>
+      <textarea id="desc" aria-describedby="descErr" aria-keyshortcuts="Control+Enter Meta+Enter"
+        placeholder="Ex. Une cour de château en ruines, une mare au sud, des vestiges au nord…"></textarea>
+      <div class="err" id="descErr" role="alert" hidden></div>
+      <p class="note" id="undoWrap"><button class="link" id="undoExample" hidden>Exemple appliqué. Rétablir mon texte</button><button class="link" id="undoRestart" hidden>Carte effacée. La rétablir</button></p>
 
-    <div class="actions">
-      <button class="primary large" id="genPrompt">Préparer le prompt →</button>
-      <span class="kbd-hint">ou Ctrl + Entrée</span>
-    </div>
-    <p class="engine" id="engineStatus" role="status" hidden><span id="engineText">Chargement du moteur de génération…</span><progress id="engineBar" max="1" value="0"></progress></p>
-    <p class="note"><button class="link" id="pasteDirect">Vous avez déjà la réponse de l’IA ? Collez-la directement</button></p>
-
-    <p class="eyebrow" id="examplesLabel">Pas d’idée ? Partez d’un exemple :</p>
-    <div class="chips" id="examples" role="group" aria-labelledby="examplesLabel">
-      <button class="chip">Une cour de château en ruines, une mare au sud, des vestiges au nord.</button>
-      <button class="chip">Une clairière de forêt tempérée avec un étang paisible et un chemin de pierre.</button>
-      <button class="chip">Un désert aride avec des dunes, une oasis cachée et des ruines antiques.</button>
-      <button class="chip">Un marécage brumeux avec des huttes sur pilotis et un autel oublié.</button>
-    </div>
-
-    <details class="adv" id="prefabsPanel" hidden>
-      <summary>Bâtiments importés</summary>
-      <p class="lead">Ajoutez un code Slab pour réutiliser sa construction dans vos cartes. Les bâtiments disponibles seront inclus dans le prochain prompt.</p>
-      <ul id="prefabsList"></ul>
-      <div class="adv-grid">
-        <div><label for="prefabID">Identifiant</label><input id="prefabID" placeholder="auberge_pierre" maxlength="64"></div>
-        <div><label for="prefabName">Nom</label><input id="prefabName" placeholder="Auberge en pierre" maxlength="160"></div>
-        <div><label for="prefabAuthor">Créateur (facultatif)</label><input id="prefabAuthor" maxlength="200"></div>
-        <div><label for="prefabSource">Lien source (facultatif)</label><input id="prefabSource" type="url" maxlength="2000"></div>
-        <div><label for="prefabLicense">Licence (facultatif)</label><input id="prefabLicense" placeholder="CC BY-NC 4.0" maxlength="200"></div>
-        <div><label for="prefabWidth">Largeur réservée (facultatif)</label><input id="prefabWidth" type="number" min="2" max="200" placeholder="Automatique"></div>
-        <div><label for="prefabLength">Longueur réservée (facultatif)</label><input id="prefabLength" type="number" min="2" max="200" placeholder="Automatique"></div>
+      <div class="actions">
+        <button class="primary large" id="genPrompt">Préparer le prompt →</button>
+        <span class="kbd-hint">ou Ctrl + Entrée</span>
       </div>
-      <label for="prefabCode" style="margin-top:14px">Code Slab</label>
-      <textarea id="prefabCode" placeholder="Collez le code copié dans TaleSpire ou TalesTavern"></textarea>
-      <p class="note">L’emprise est estimée à partir des positions des objets. Agrandissez-la pour les toits ou les éléments qui dépassent.</p>
-      <div class="actions"><button class="ghost" id="importPrefab">Importer le bâtiment</button></div>
-      <p id="prefabStatus" class="note" role="status" aria-live="polite"></p>
-    </details>
+      <p class="engine" id="engineStatus" role="status" hidden><span id="engineText">Chargement du moteur de génération…</span><progress id="engineBar" max="1" value="0"></progress></p>
+      <p class="note"><button class="link" id="pasteDirect">Vous avez déjà la réponse de l’IA ? Collez-la directement</button></p>
 
-    <details class="adv">
-      <summary>Options avancées</summary>
-      <div class="adv-grid">
-        <div><label for="w">Largeur (cases)</label><input id="w" type="number" value="50" min="8" max="200"></div>
-        <div><label for="l">Longueur (cases)</label><input id="l" type="number" value="50" min="8" max="200"></div>
-        <div><label for="biome">Biome imposé</label>
-          <select id="biome">
-            <option value="">Laisser l’IA choisir</option>
-            <option value="temperate_forest">Forêt tempérée</option>
-            <option value="subtropical_forest">Forêt subtropicale</option>
-            <option value="dead_forest">Forêt morte</option>
-            <option value="swamp">Marécage</option>
-            <option value="desert">Désert</option>
-            <option value="tundra">Toundra</option>
-            <option value="lava">Volcanique</option>
-            <option value="beach">Plage</option>
-          </select>
+      <p class="eyebrow" id="examplesLabel">Pas d’idée ? Partez d’un exemple :</p>
+      <div class="chips" id="examples" role="group" aria-labelledby="examplesLabel">
+        <button class="chip">Une cour de château en ruines, une mare au sud, des vestiges au nord.</button>
+        <button class="chip">Une clairière de forêt tempérée avec un étang paisible et un chemin de pierre.</button>
+        <button class="chip">Un désert aride avec des dunes, une oasis cachée et des ruines antiques.</button>
+        <button class="chip">Un marécage brumeux avec des huttes sur pilotis et un autel oublié.</button>
+      </div>
+
+      <details class="adv" id="prefabsPanel" hidden>
+        <summary>Bâtiments importés</summary>
+        <p class="lead">Ajoutez un code Slab pour réutiliser sa construction dans vos cartes. Les bâtiments disponibles seront inclus dans le prochain prompt.</p>
+        <ul id="prefabsList"></ul>
+        <div class="adv-grid">
+          <div><label for="prefabID">Identifiant</label><input id="prefabID" placeholder="auberge_pierre" maxlength="64"></div>
+          <div><label for="prefabName">Nom</label><input id="prefabName" placeholder="Auberge en pierre" maxlength="160"></div>
+          <div><label for="prefabAuthor">Créateur (facultatif)</label><input id="prefabAuthor" maxlength="200"></div>
+          <div><label for="prefabSource">Lien source (facultatif)</label><input id="prefabSource" type="url" maxlength="2000"></div>
+          <div><label for="prefabLicense">Licence (facultatif)</label><input id="prefabLicense" placeholder="CC BY-NC 4.0" maxlength="200"></div>
+          <div><label for="prefabWidth">Largeur réservée (facultatif)</label><input id="prefabWidth" type="number" min="2" max="200" placeholder="Automatique"></div>
+          <div><label for="prefabLength">Longueur réservée (facultatif)</label><input id="prefabLength" type="number" min="2" max="200" placeholder="Automatique"></div>
         </div>
+        <label for="prefabCode" style="margin-top:14px">Code Slab</label>
+        <textarea id="prefabCode" placeholder="Collez le code copié dans TaleSpire ou TalesTavern"></textarea>
+        <p class="note">L’emprise est estimée à partir des positions des objets. Agrandissez-la pour les toits ou les éléments qui dépassent.</p>
+        <div class="actions"><button class="ghost" id="importPrefab">Importer le bâtiment</button></div>
+        <p id="prefabStatus" class="note" role="status" aria-live="polite"></p>
+      </details>
+
+      <details class="adv">
+        <summary>Options avancées</summary>
+        <div class="adv-grid">
+          <div><label for="w">Largeur (cases)</label><input id="w" type="number" value="50" min="8" max="200"></div>
+          <div><label for="l">Longueur (cases)</label><input id="l" type="number" value="50" min="8" max="200"></div>
+          <div><label for="biome">Biome imposé</label>
+            <select id="biome">
+              <option value="">Laisser l’IA choisir</option>
+              <option value="temperate_forest">Forêt tempérée</option>
+              <option value="subtropical_forest">Forêt subtropicale</option>
+              <option value="dead_forest">Forêt morte</option>
+              <option value="swamp">Marécage</option>
+              <option value="desert">Désert</option>
+              <option value="tundra">Toundra</option>
+              <option value="lava">Volcanique</option>
+              <option value="beach">Plage</option>
+            </select>
+          </div>
+        </div>
+        <p class="note" id="sizeNote" role="status" hidden>La taille va de 8 à 200 cases : la valeur a été ajustée.</p>
+        <p class="note">Une grande carte est découpée en morceaux à coller côte à côte : TaleSpire n’accepte pas plus de 30 ko environ par collage.</p>
+      </details>
       </div>
-      <p class="note" id="sizeNote" role="status" hidden>La taille va de 8 à 200 cases : la valeur a été ajustée.</p>
-      <p class="note">Une grande carte est découpée en morceaux à coller côte à côte : TaleSpire n’accepte pas plus de 30 ko environ par collage.</p>
-    </details>
+      <figure class="sample">
+        <img src="/static/exemple-carte.png" width="300" height="300"
+          alt="Exemple de carte vue du dessus : une cour herbeuse semée d’arbres et de rochers, une mare ronde en son centre, des ruines au nord reliées par un chemin.">
+        <figcaption><b>Exemple de résultat</b>« Une cour de château en ruines, une mare en son centre, des vestiges au nord. »
+          <button class="link" id="trySample">Partir de cet exemple</button></figcaption>
+      </figure>
+    </div>
   </section>
 
   <!-- Step 2: hand the prompt to an AI -->
@@ -577,6 +595,11 @@ async function preparePrompt(){
 $('genPrompt').onclick = preparePrompt;
 onCtrlEnter($('desc'), preparePrompt);
 $('pasteDirect').onclick = () => setStep(3);
+$('trySample').onclick = () => {
+  $('desc').value = 'Une cour de château en ruines, une mare en son centre, des vestiges au nord.';
+  state.desc = $('desc').value; save(); showDescErr('');
+  $('desc').focus();
+};
 
 // Step 2: one obvious action, copy; the prompt itself stays folded away.
 function renderPrompt(){

@@ -289,6 +289,17 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   `build-web.sh` writes the uncompressed size into it (Cloudflare serves the
   14 MB engine Brotli-compressed, ~2.8 MB on the wire, so Content-Length can't
   be the total). The UI shows a progress line only if loading takes > 0.6 s.
+  Preparing the prompt does not wait for it: `build-web.sh` writes the prompt's
+  scene-independent head (`nl.Catalog.PromptHead`, via `cmd/web/prompthead`)
+  to `prompt-head.txt`, and until the engine is ready `cartographe.js` answers
+  `/api/prompt` itself by appending the same scene lines as `nl.userPrompt`.
+  `TestPromptIsHeadPlusSceneLines` holds the engine to that contract and the
+  browser journey checks the early prompt is identical to the engine's.
+- **The landing shows a result before anything is asked.** Step 1 carries the
+  castle example's real preview (`static/exemple-carte.png`, 300 px, 7.5 kB)
+  with "Partir de cet exemple". `TestSampleMapIsCurrent` fails when it no
+  longer matches what the generator draws; after a deliberate preview change,
+  run `go test ./internal/server -run TestSampleMapIsCurrent -update`.
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.
