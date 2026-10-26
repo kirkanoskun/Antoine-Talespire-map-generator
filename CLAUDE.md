@@ -232,6 +232,22 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   used by the automated `/api/describe` path stays single-shot JSON, since its
   reply must satisfy the validate/retry loop. `nl.PromptVersion` carries the
   wording revision and is printed at the top of the generated prompt.
+- **The paste-back reads the AI's whole reply.** Visitors paste ChatGPT's answer
+  as-is (French prose, a ```json fence). `/api/generate` therefore also takes
+  `{"text": ...}` and extracts the object with `nl.ExtractJSON`, the same reader
+  the automated path uses. Rejections carry a `kind` (`no_json`, `bad_json`,
+  `invalid_map`) that the UI turns into French guidance, including a ready-made
+  correction message to send back to the AI; the Go error stays as the detail.
+- **The map is the hero (UI redesign after the Impeccable critique, 22/40).**
+  `PRODUCT.md` is the design brief (register: product; French-first GMs;
+  "cartographer's workshop"; not generic AI SaaS, not cheesy fantasy, not a dev
+  tool). Step 2 shows one "Copier le prompt" action and folds the English prompt
+  away; step 4 frames the preview as a survey sheet (rulers, grid, north arrow,
+  numbered zone markers) with a legend that `preview.Legend` derives from the
+  exact colours drawn, so the key cannot drift from the image. Cinzel is kept
+  for the brand and the map's cartouche only. The flow survives reloads and app
+  switches (`sessionStorage`) and the browser Back button (`history` per step).
+  `.impeccable/critique/` keeps the critique snapshots and their scores.
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.

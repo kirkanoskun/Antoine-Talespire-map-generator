@@ -132,8 +132,8 @@ func TestExtractJSON(t *testing.T) {
 		"no braces here":          "",
 	}
 	for in, want := range cases {
-		if got := extractJSON(in); got != want {
-			t.Errorf("extractJSON(%q) = %q, want %q", in, got, want)
+		if got := ExtractJSON(in); got != want {
+			t.Errorf("ExtractJSON(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
