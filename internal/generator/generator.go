@@ -241,7 +241,7 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 	// is too big for one slab.
 	size := g.sliceSize
 	if size == 0 && len(code) > TaleSpireSlabLimitBytes {
-		size = firstSliceGuess(len(code), field.Width, field.Length)
+		size = evenSlice(firstSliceGuess(len(code), field.Width, field.Length), field.Width, field.Length)
 	}
 	if size == 0 {
 		return res, nil
@@ -255,7 +255,7 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		// limit is only documented as "about 30 kB"; a slice too dense to fit
 		// even when small (a big building, say) is reported instead.
 		if g.sliceSize == 0 && len(oversizedSlices(slices, autoSliceTarget)) > 0 && size > minAutoSlice {
-			size = max(minAutoSlice, size*3/4)
+			size = evenSlice(max(minAutoSlice, size*3/4), field.Width, field.Length)
 			continue
 		}
 		res.Slices, res.SliceSize = slices, size
@@ -286,6 +286,15 @@ func oversizedSlices(slices [][]string, limit int) [][3]int {
 		}
 	}
 	return out
+}
+
+// evenSlice keeps the number of slices that size gives but spreads the tiles
+// evenly between them, so a 160-tile side becomes 3 slices of 54 rather than
+// 76 + 76 + an 8-tile sliver that is awkward to place in TaleSpire.
+func evenSlice(size, w, l int) int {
+	side := max(w, l)
+	n := (side + size - 1) / size
+	return (side + n - 1) / n
 }
 
 // firstSliceGuess estimates the slice side at which each slab fits the limit,

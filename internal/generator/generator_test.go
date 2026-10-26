@@ -213,6 +213,10 @@ func TestOversizedMapIsSlicedAutomatically(t *testing.T) {
 	if len(res.Warnings) != 0 {
 		t.Errorf("no warning expected once every slice fits, got %v", res.Warnings)
 	}
+	// Tiles are spread evenly: no thin sliver of a last column to place.
+	if last := 110 - (len(res.Slices)-1)*res.SliceSize; last*2 < res.SliceSize {
+		t.Errorf("last column is %d tiles for slices of %d: slices should be even", last, res.SliceSize)
+	}
 
 	small, err := ir.Parse([]byte(`{
 		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},
