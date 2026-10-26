@@ -139,6 +139,26 @@ type HeightField struct {
 	buildings [][]bool
 	dug       [][]bool // ground removed under a building's underground part
 	pois      [][2]int // tiles where a point of interest was actually placed
+	props     [][]PropKind
+}
+
+// PropKind is the scatter a tile carries on top of its ground (at most one
+// prop per tile), recorded so the preview can show density, not just terrain.
+type PropKind uint8
+
+const (
+	PropNone  PropKind = iota
+	PropTree           // the "vegetation" category on land: trees, cacti
+	PropStone          // the "stones" category
+	PropMisc           // the "misc" category (bushes, flowers, ferns…) and coral
+)
+
+// PropAt returns the scatter placed on tile (x,y).
+func (f *HeightField) PropAt(x, y int) PropKind {
+	if f.props == nil {
+		return PropNone
+	}
+	return f.props[x][y]
 }
 
 // POIs returns the tiles where points of interest were placed, scattered ones
@@ -468,10 +488,15 @@ func (g *Generator) placeProps(out []placement, biome *taleslabentities.Biome, d
 	categories := []struct {
 		elem     elementtype.ElementType
 		override string
+		kind     PropKind
 	}{
-		{elementtype.Tree, "vegetation"},
-		{elementtype.Stone, "stones"},
-		{elementtype.Misc, "misc"},
+		{elementtype.Tree, "vegetation", PropTree},
+		{elementtype.Stone, "stones", PropStone},
+		{elementtype.Misc, "misc", PropMisc},
+	}
+	f.props = make([][]PropKind, f.Width)
+	for x := range f.props {
+		f.props[x] = make([]PropKind, f.Length)
 	}
 
 	for x := 1; x < f.Width-1; x++ {
@@ -527,6 +552,10 @@ func (g *Generator) placeProps(out []placement, biome *taleslabentities.Biome, d
 					out = append(out, placement{part: part, tileX: x, tileY: y, z: t.height + part.OffsetZ, baseRotation: rot})
 				}
 				occupied[x][y] = true
+				f.props[x][y] = cat.kind
+				if cat.kind == PropTree && t.relief == string(elementtype.Water) {
+					f.props[x][y] = PropMisc // underwater "vegetation" is coral, not a tree
+				}
 				break // one prop per tile
 			}
 		}

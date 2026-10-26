@@ -144,6 +144,9 @@
   .swatch.pin{border-radius:50%; border:3px solid var(--bg); box-shadow:0 0 0 1px var(--control)}
   .swatch.masonry{background-image:linear-gradient(rgba(25,25,25,.45) 1px, transparent 1px), linear-gradient(90deg, rgba(25,25,25,.45) 1px, transparent 1px);
     background-size:8px 8px}
+  .swatch.waves{background-image:repeating-linear-gradient(0deg, transparent 0 4px, rgba(255,255,255,.3) 4px 5px)}
+  .swatch.hatch{background-image:repeating-linear-gradient(45deg, rgba(25,25,25,.35) 0 1px, transparent 1px 4px)}
+  .legend small{color:var(--muted); font-size:13px; margin-left:auto; font-variant-numeric:tabular-nums}
   .piece-label{position:absolute; margin:4px 0 0 4px; padding:0 5px; border-radius:4px; background:rgba(27,21,17,.8);
     color:var(--ink); font-size:11px; font-weight:600; line-height:18px}
   .engine{display:flex; align-items:center; gap:10px; margin:12px 0 0; font-size:13px; color:var(--muted)}
@@ -416,7 +419,8 @@ const BIOMES = {temperate_forest: 'Forêt tempérée', subtropical_forest: 'For�
   swamp: 'Marécage', desert: 'Désert', tundra: 'Toundra', lava: 'Volcanique', beach: 'Plage'};
 // What each preview colour stands for (keys come from the server's legend).
 const LEGEND_NAMES = {water: 'Eau', ground: 'Sol naturel', base_ground: 'Chemin, sol nu', mountain: 'Roche, relief',
-  ruins: 'Ruines', other: 'Autre terrain', building: 'Emprise de bâtiment', poi: 'Point d’intérêt'};
+  ruins: 'Ruines', other: 'Autre terrain', building: 'Emprise de bâtiment', poi: 'Point d’intérêt',
+  tree: 'Arbres', stone: 'Rochers', misc: 'Buissons, fleurs, détails', boundary: 'Limite entre zones'};
 // French names for the points of interest the generator understands.
 const POI_NAMES = {broken_pillar: 'colonne brisée', pillar: 'pilier', column: 'colonne', altar: 'autel',
   campfire: 'feu de camp', bonfire: 'grand feu', skull: 'crâne', skulls: 'tas de crânes', skeleton: 'squelette',
@@ -661,7 +665,10 @@ function renderMap(data){
   // Reserve the map's shape before the image loads, so nothing collapses.
   cell.style.aspectRatio = `${w} / ${l}`;
   $('revertWrap').hidden = !state.previousReply;
-  const img = el('img', {src: data.preview_url, alt: `Aperçu vu du dessus de la carte « ${map.name || 'sans nom'} »`});
+  // The alt text summarises what the image shows, for those who can't see it.
+  const counted = (data.legend || []).filter((e) => e.count).map((e) => `${e.count} ${(LEGEND_NAMES[e.key] || e.key).toLowerCase()}`);
+  const terrain = (data.legend || []).filter((e) => !e.count && e.key !== 'boundary').map((e) => (LEGEND_NAMES[e.key] || e.key).toLowerCase());
+  const img = el('img', {src: data.preview_url, alt: `Aperçu vu du dessus de la carte « ${map.name || 'sans nom'} » : ${zones.length} zones, terrain ${terrain.join(', ')}${counted.length ? ' ; ' + counted.join(', ') : ''}.`});
   cell.appendChild(img);
   const step = gridStep(Math.max(w, l));
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -705,12 +712,23 @@ function renderMap(data){
   for (let y = step; y <= l; y += step){ const s = el('span', {}, String(y)); s.style.top = (y / l) * 100 + '%'; ry.appendChild(s); }
 
   // Legend, straight from the colours the server actually drew.
+  // Symbols (trees, rocks, details, borders) are shown over the ground they
+  // are drawn on, as on the map.
+  const groundColor = ((data.legend || []).find((e) => e.key === 'ground') || {}).color || '#2c2219';
+  const symbols = {
+    tree: (c) => `radial-gradient(circle, ${c} 0 58%, transparent 62%), ${groundColor}`,
+    dot: (c) => `radial-gradient(circle, ${c} 0 28%, transparent 32%), ${groundColor}`,
+    stone: (c) => `linear-gradient(${c}, ${c}) center / 7px 7px no-repeat, ${groundColor}`,
+    line: (c) => `linear-gradient(${c}, ${c}) center / 100% 5px no-repeat, ${groundColor}`,
+  };
   const legend = (data.legend || []).map((entry) => {
     const li = el('li');
     const sw = el('span', {className: 'swatch' + (entry.pattern ? ' ' + entry.pattern : '')});
-    sw.style.backgroundColor = entry.color;
+    if (symbols[entry.pattern]) sw.style.background = symbols[entry.pattern](entry.color);
+    else sw.style.backgroundColor = entry.color;
     sw.setAttribute('aria-hidden', 'true');
     li.append(sw, LEGEND_NAMES[entry.key] || entry.key);
+    if (entry.count) li.append(el('small', {}, entry.count.toLocaleString('fr-FR')));
     return li;
   });
   if (zones.length){
