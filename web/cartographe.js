@@ -46,9 +46,29 @@
     return WebAssembly.instantiate(buf, go.importObject);
   }
 
+  // Until the engine is ready, a prompt (pure text) is assembled here from the
+  // head the build wrote out (nl.Catalog.PromptHead) and the same scene lines
+  // as nl.userPrompt, so describing a scene never waits for the engine's
+  // download. Once it has loaded, the engine answers as for any request.
+  const promptHead = realFetch('/prompt-head.txt')
+    .then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status))));
+  promptHead.catch(() => {});
+  let engineReady = false;
+  async function quickPrompt(body) {
+    const head = await promptHead;
+    const req = JSON.parse(body || '{}');
+    const description = String(req.description || '').trim();
+    if (!description) return { status: 400, data: { error: 'description is empty' } };
+    const width = req.width > 0 ? req.width : 50, length = req.length > 0 ? req.length : 50;
+    let scene = `Map: width=${width}, length=${length}`;
+    if (req.biome) scene += `\nUse this biome for the map (do not choose another): ${req.biome}`;
+    scene += '\n\nDescription:\n' + description;
+    return { status: 200, data: { prompt: head + scene } };
+  }
+
   // Start loading the engine immediately; requests wait for it.
   const ready = new Promise((resolve, reject) => {
-    window.__cartographeReady = () => { report('ready'); resolve(); };
+    window.__cartographeReady = () => { engineReady = true; report('ready'); resolve(); };
     window.__cartographeFailed = (msg) => { report('failed'); reject(new Error(msg)); };
     const go = new Go();
     instantiate(go).then((result) => go.run(result.instance))
@@ -68,6 +88,14 @@
       return realFetch(input, init);
     }
     const method = (init.method || (typeof input === 'string' ? 'GET' : input.method) || 'GET').toUpperCase();
+    if (!engineReady && method === 'POST' && url.pathname === '/api/prompt') {
+      try {
+        const q = await quickPrompt(typeof init.body === 'string' ? init.body : '');
+        return new Response(JSON.stringify(q.data), { status: q.status, headers: { 'Content-Type': 'application/json' } });
+      } catch {
+        // No head file (an old build, say): wait for the engine instead.
+      }
+    }
     const res = await goFetch(method, url.pathname + url.search, typeof init.body === 'string' ? init.body : '');
 
     let body = res.body;

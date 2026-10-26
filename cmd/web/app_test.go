@@ -8,8 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	talespire "github.com/kirkanoskun/antoine-talespire-map-generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/spatial"
 )
 
@@ -102,6 +104,30 @@ func TestPastedReplyIsAccepted(t *testing.T) {
 	decode(t, r, &out)
 	if r.status != http.StatusOK || out.Code == "" || len(out.Legend) == 0 {
 		t.Fatalf("status %d, code %d chars, legend %v", r.status, len(out.Code), out.Legend)
+	}
+}
+
+// While the engine loads, web/cartographe.js assembles the prompt itself from
+// the head the build writes (cmd/web/prompthead) plus these exact scene lines.
+// This holds the engine to that contract; the browser journey checks the
+// JavaScript side against the engine.
+func TestPromptIsHeadPlusSceneLines(t *testing.T) {
+	catalog, err := nl.NewCatalog(talespire.BiomesJSON(), generator.POIAliasNames())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ body, scene string }{
+		{`{"description":"  une clairière  ","width":40,"length":30,"biome":""}`,
+			"Map: width=40, length=30\n\nDescription:\nune clairière"},
+		{`{"description":"un désert","width":0,"length":0,"biome":"desert"}`,
+			"Map: width=50, length=50\nUse this biome for the map (do not choose another): desert\n\nDescription:\nun désert"},
+	} {
+		r := call(handler(t), "POST", "/api/prompt", c.body)
+		var out struct{ Prompt string }
+		decode(t, r, &out)
+		if want := catalog.PromptHead() + c.scene; out.Prompt != want {
+			t.Errorf("%s: the engine's prompt is not the head plus the scene lines the website writes", c.body)
+		}
 	}
 }
 

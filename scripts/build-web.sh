@@ -25,6 +25,9 @@ done
 
 echo "==> assembling the site"
 cp web/_headers "$OUT/"
+# The prompt's scene-independent head, so the bridge can prepare a prompt
+# while the engine is still downloading.
+go run ./cmd/web/prompthead > "$OUT/prompt-head.txt"
 # The bridge reports download progress against the engine's real size.
 WASM_BYTES="$(wc -c < "$OUT/app.wasm" | tr -d ' ')"
 sed "s/const WASM_BYTES = 0;/const WASM_BYTES = $WASM_BYTES;/" web/cartographe.js > "$OUT/cartographe.js"
