@@ -160,8 +160,23 @@
   .export .err{margin:0 0 14px}
   .zones small{display:block; color:var(--muted); font-size:13px}
   .warnings{margin:24px 0 0; padding-left:20px; color:var(--muted); font-size:14px}
-  .slices{display:grid; gap:6px; margin-top:12px}
-  .slices button{padding:8px 6px; font-size:13px}
+  .export h3{font-size:15px}
+  .placing{margin:10px 0 0; padding-left:20px; font-size:14px; color:var(--muted)}
+  .placing li{margin-bottom:4px}
+  .pieces{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:8px}
+  .piece{display:grid; grid-template-columns:24px 1fr auto; gap:2px 10px; align-items:center;
+    padding:8px 10px; border:1px solid var(--border); border-radius:10px; transition:border-color .15s var(--ease)}
+  .piece.next{border-color:var(--accent)}
+  .piece .zone-badge{position:static; margin:0}
+  .piece.done .zone-badge{background:var(--accent-soft); color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+  .piece b{font-weight:600; font-size:14px}
+  .piece small{display:block; color:var(--muted); font-size:12.5px}
+  .piece button{padding:8px 12px; font-size:13px}
+  .piece label{grid-column:2 / 4; display:flex; align-items:center; gap:6px; margin:0; font-size:13px; font-weight:400; color:var(--muted)}
+  .piece input{width:auto; accent-color:var(--accent)}
+  .pieces-progress{margin:12px 0 0; font-size:14px; color:var(--ink)}
+  .piece-label.next{background:var(--accent); color:var(--accent-ink)}
+  .piece-label.done{background:rgba(27,21,17,.6); color:var(--muted)}
 
   /* How it works: an ordered list, not a card grid */
   .howto{margin-top:64px; border-top:1px solid var(--border); padding-top:28px}
@@ -354,11 +369,17 @@
       <div class="side">
         <div class="panel export">
           <div class="err" id="oversize" hidden></div>
-          <button class="primary large" id="copyCode">Copier le code TaleSpire</button>
-          <p>Dans TaleSpire, ouvrez un plateau (board), puis collez avec <b>Ctrl + V</b> (<b>Cmd + V</b> sur Mac).</p>
+          <div id="singleExport">
+            <button class="primary large" id="copyCode">Copier le code TaleSpire</button>
+            <p>Dans TaleSpire, ouvrez un plateau (board), puis collez avec <b>Ctrl + V</b> (<b>Cmd + V</b> sur Mac).</p>
+          </div>
           <div id="slicesWrap" hidden>
-            <p id="slicesLabel"></p>
-            <div class="slices" id="slices"></div>
+            <h3 id="piecesTitle"></h3>
+            <p class="note" id="slicesLabel" style="margin:0"></p>
+            <ol class="placing" id="placing"></ol>
+            <ol class="pieces" id="slices"></ol>
+            <p class="pieces-progress" id="piecesProgress" role="status" aria-live="polite"></p>
+            <button class="link" id="copyWhole" hidden>Copier plutôt la carte entière</button>
           </div>
           <details style="margin-top:12px"><summary>Afficher le code</summary><div class="codebox" id="codeBox"></div></details>
         </div>
@@ -701,6 +722,7 @@ function renderMap(data){
     for (let y = size; y < l; y += size){ const ln = line(0, y, w, y); ln.setAttribute('stroke', 'rgba(240,232,221,.9)'); ln.setAttribute('stroke-width', 2); ln.removeAttribute('stroke-dasharray'); }
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
       const tag = el('span', {className: 'piece-label'}, `Morceau ${y * cols + x + 1}`);
+      tag.dataset.piece = String(y * cols + x);
       tag.style.left = `${(x * size / w) * 100}%`; tag.style.top = `${(y * size / l) * 100}%`;
       tag.setAttribute('aria-hidden', 'true');
       cell.appendChild(tag);
@@ -754,25 +776,10 @@ function renderMap(data){
   $('codeBox').textContent = data.code || '';
   const tooBig = (data.code || '').length > SLAB_LIMIT;
   $('slicesWrap').hidden = !slices.length;
+  $('singleExport').hidden = slices.length > 0;
   // Sliced because it is too big: only the pieces will save in TaleSpire.
-  $('copyCode').hidden = slices.length > 0 && tooBig;
-  $('copyCode').className = slices.length ? 'ghost large' : 'primary large';
-  $('copyCode').textContent = slices.length ? 'Copier la carte entière' : 'Copier le code TaleSpire';
-  if (slices.length){
-    const cols = slices.length, rows = slices[0].length;
-    $('slicesLabel').textContent = (tooBig
-      ? `La carte dépasse les 30 ko environ que TaleSpire accepte en un collage : elle est découpée en ${cols * rows} morceaux`
-      : `La carte est découpée en ${cols * rows} morceaux`)
-      + ` de ${size} × ${size} cases au plus, numérotés sur l’aperçu. Copiez-les et collez-les un par un, chacun juste à côté du précédent, en suivant la grille.`;
-    const grid = $('slices'); grid.replaceChildren();
-    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
-      const b = el('button', {className: 'ghost'}, `${y * cols + x + 1}`);
-      b.setAttribute('aria-label', `Copier le morceau ligne ${y + 1}, colonne ${x + 1}`);
-      b.onclick = async () => { if (await copyText(slices[x][y])){ flash(b, '✓', `${y * cols + x + 1}`); announce(`Morceau ${y * cols + x + 1} copié.`); } };
-      grid.appendChild(b);
-    }
-  }
+  $('copyWhole').hidden = !slices.length || tooBig;
+  renderPieces(slices, size, w, l, tooBig, data.code || '');
   // A slab over TaleSpire's limit pastes but fails on save: say so where the
   // copy buttons are, not in a footnote. Automatic slicing makes this rare
   // (a piece too dense even when small, a big building say).
@@ -783,6 +790,88 @@ function renderMap(data){
   $('mapWarnings').replaceChildren(...warnings.map((t) => el('li', {}, t)));
   $('warningsWrap').hidden = !warnings.length;
 }
+// A sliced map is pasted piece by piece: a checklist keeps track of what is
+// already on the board (ticks survive a reload, keyed to the map's code) and
+// highlights the next piece, in the list and on the preview.
+let pieces = null;
+function codeKey(code){
+  let h = 2166136261; // FNV-1a over the code: a different map starts afresh
+  for (let i = 0; i < code.length; i++){ h ^= code.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36) + ':' + code.length;
+}
+function renderPieces(slices, size, w, l, tooBig, code){
+  pieces = null;
+  if (!slices.length) return;
+  const cols = slices.length, rows = slices[0].length, n = cols * rows;
+  const key = codeKey(code) + ':' + size;
+  if (!state.pieces || state.pieces.key !== key){ state.pieces = {key, done: []}; save(); }
+  pieces = {cols, rows, n, slices};
+  $('piecesTitle').textContent = `Carte en ${n} morceaux`;
+  $('slicesLabel').textContent = (tooBig
+    ? `TaleSpire n’accepte pas plus de 30 ko environ par collage : la carte est découpée en ${n} morceaux`
+    : `La carte est découpée en ${n} morceaux`) + ` de ${size} × ${size} cases au plus, numérotés sur l’aperçu.`;
+  const steps = ['Dans TaleSpire, ouvrez un plateau (board).',
+    'Copiez le morceau 1 et collez-le où vous voulez (Ctrl + V, Cmd + V sur Mac).'];
+  const where = [cols > 1 ? 'le 2 à droite du 1' : '', rows > 1 ? `le ${cols + 1} sous le 1` : ''].filter(Boolean).join(', ');
+  steps.push(`Collez chaque morceau suivant bord contre bord avec ses voisins, comme sur l’aperçu : ${where}. Ne les faites pas pivoter.`);
+  $('placing').replaceChildren(...steps.map((t) => el('li', {}, t)));
+
+  const list = $('slices'); list.replaceChildren();
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
+    const i = y * cols + x;
+    const pw = Math.min(size, w - x * size), pl = Math.min(size, l - y * size);
+    const li = el('li', {className: 'piece'}); li.dataset.piece = String(i);
+    const info = el('span'); info.append(el('b', {}, `Morceau ${i + 1}`), el('small', {}, `ligne ${y + 1}, colonne ${x + 1} · ${pw} × ${pl} cases`));
+    const copy = el('button', {className: 'ghost'}, 'Copier');
+    copy.setAttribute('aria-label', `Copier le morceau ${i + 1}`);
+    const tick = el('input', {type: 'checkbox', id: `piece${i}`});
+    const label = el('label'); label.htmlFor = tick.id; label.append(tick, 'Collé dans TaleSpire');
+    copy.onclick = async () => {
+      if (!(await copyText(slices[x][y]))) return;
+      flash(copy, 'Copié ✓', 'Copier');
+      markPiece(i, true);
+      announce(`Morceau ${i + 1} copié. Collez-le dans TaleSpire.`);
+    };
+    tick.onchange = () => markPiece(i, tick.checked);
+    li.append(el('span', {className: 'zone-badge'}, String(i + 1)), info, copy, label);
+    list.appendChild(li);
+  }
+  updatePieces();
+}
+function markPiece(i, done){
+  const set = new Set(state.pieces.done);
+  if (done) set.add(i); else set.delete(i);
+  state.pieces.done = [...set].sort((a, b) => a - b); save();
+  updatePieces();
+}
+function updatePieces(){
+  if (!pieces) return;
+  const done = new Set(state.pieces.done);
+  let next = -1;
+  for (let i = 0; i < pieces.n; i++) if (!done.has(i)){ next = i; break; }
+  for (const li of $('slices').children){
+    const i = +li.dataset.piece;
+    li.classList.toggle('done', done.has(i));
+    li.classList.toggle('next', i === next);
+    li.querySelector('input').checked = done.has(i);
+    li.querySelector('button').className = i === next ? 'primary' : 'ghost';
+  }
+  for (const tag of $('mapCell').querySelectorAll('.piece-label')){
+    const i = +tag.dataset.piece;
+    tag.classList.toggle('done', done.has(i));
+    tag.classList.toggle('next', i === next);
+    tag.textContent = (done.has(i) ? '✓ ' : '') + `Morceau ${i + 1}`;
+  }
+  $('piecesProgress').textContent = next < 0
+    ? `Les ${pieces.n} morceaux sont collés : la carte est complète. Bonne partie !`
+    : `${done.size} morceau${done.size > 1 ? 'x' : ''} collé${done.size > 1 ? 's' : ''} sur ${pieces.n}. Suivant : le morceau ${next + 1}.`;
+}
+$('copyWhole').onclick = async () => {
+  if (await copyText((result && result.code) || '')){
+    flash($('copyWhole'), 'Carte entière copiée ✓', 'Copier plutôt la carte entière');
+    announce('Carte entière copiée.');
+  }
+};
 $('copyCode').onclick = async () => {
   const idle = $('copyCode').textContent;
   if (await copyText((result && result.code) || '')){ flash($('copyCode'), 'Code copié ✓', idle); announce('Code TaleSpire copié.'); }

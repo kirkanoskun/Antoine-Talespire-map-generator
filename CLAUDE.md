@@ -211,9 +211,18 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   slicing is enabled. **Slicing is automatic by default** (`-slice 0`, the
   website and desktop app alike): only when the whole map is over the limit, at
   the largest size whose every slab stays under 27 kB (a margin, since the
-  limit is only "about 30 kB"), shrinking by quarters from an even-spread guess.
-  A 200×200 map comes out as 4×4 slabs, all under 15 kB. Only a slice still too
-  dense at the 8-tile floor (a big building) is reported as a warning.
+  limit is only "about 30 kB"), shrinking by quarters from an even-spread guess,
+  and spreading tiles evenly between slices (`evenSlice`: 160 tiles → 3 × 54,
+  not 76 + 76 + an 8-tile sliver). A 200×200 map comes out as 3×3 slabs of 67
+  tiles, all under 22 kB. Only a slice still too dense at the 8-tile floor (a
+  big building) is reported as a warning.
+- **Pasting a sliced map is a checklist.** The UI lists the pieces with their
+  size and row/column, concrete placement steps (paste piece 1 anywhere, then
+  each next one edge to edge as on the preview, unrotated), a Copier button and
+  a "Collé dans TaleSpire" tick per piece. Copying ticks it; the next piece is
+  highlighted in the list and on the preview; ticks persist per map
+  (`state.pieces`, keyed by an FNV hash of the code) and the list closes on a
+  "carte complète" message.
 
 ### Phase 4 web UI & iteration notes
 
