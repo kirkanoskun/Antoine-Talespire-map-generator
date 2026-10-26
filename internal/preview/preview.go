@@ -22,15 +22,20 @@ import (
 // not listed fall back to fallbackRelief.
 var reliefPalette = map[string]color.RGBA{
 	"water":       {60, 110, 180, 255},
-	"base_ground": {170, 160, 110, 255},
+	"base_ground": {214, 186, 120, 255}, // paths: a sand clearly lighter than stone
 	"ground":      {70, 130, 65, 255},
-	"mountain":    {130, 125, 120, 255},
+	"mountain":    {125, 120, 118, 255},
 	"ruins":       {150, 140, 125, 255},
 }
 
+// texturedReliefs are told apart by pattern as well as colour (ruins and
+// mountain are close in value once height-shaded): the legend reports it.
+var texturedReliefs = map[string]string{"ruins": "masonry"}
+
 var (
 	boundaryColor  = color.RGBA{25, 25, 25, 255}
-	poiColor       = color.RGBA{240, 60, 200, 255}
+	poiColor       = color.RGBA{246, 238, 222, 255} // a light pin with a dark ring reads on any terrain
+	poiRingColor   = color.RGBA{27, 21, 17, 255}
 	anchorColor    = color.RGBA{20, 20, 20, 255}
 	buildingColor  = color.RGBA{195, 142, 65, 255}
 	fallbackRelief = color.RGBA{150, 150, 150, 255}
@@ -41,11 +46,13 @@ var (
 var reliefOrder = []string{"water", "ground", "base_ground", "mountain", "ruins"}
 
 // LegendEntry is one swatch of the preview's key: what a colour stands for.
-// Key is a relief key, "other" (a relief outside the palette), "building",
-// "poi" or "anchor"; the UI translates it. Color is the unshaded "#rrggbb".
+// Key is a relief key, "other" (a relief outside the palette), "building" or
+// "poi"; the UI translates it. Color is the unshaded "#rrggbb"; Pattern names
+// a texture drawn over it ("masonry"), or for "poi" the "pin" shape.
 type LegendEntry struct {
-	Key   string `json:"key"`
-	Color string `json:"color"`
+	Key     string `json:"key"`
+	Color   string `json:"color"`
+	Pattern string `json:"pattern,omitempty"`
 }
 
 // Legend lists, in a fixed order, the colours that actually appear in the
@@ -69,27 +76,17 @@ func Legend(doc *ir.IR, field *generator.HeightField) []LegendEntry {
 	var out []LegendEntry
 	for _, key := range reliefOrder {
 		if present[key] {
-			out = append(out, LegendEntry{key, hex(reliefPalette[key])})
+			out = append(out, LegendEntry{key, hex(reliefPalette[key]), texturedReliefs[key]})
 		}
 	}
 	if present["other"] {
-		out = append(out, LegendEntry{"other", hex(fallbackRelief)})
+		out = append(out, LegendEntry{"other", hex(fallbackRelief), ""})
 	}
 	if present["building"] {
-		out = append(out, LegendEntry{"building", hex(buildingColor)})
+		out = append(out, LegendEntry{"building", hex(buildingColor), ""})
 	}
-	for _, z := range doc.Zones {
-		for _, poi := range z.PointsOfInterest {
-			if !poi.Position.Scattered {
-				present["poi"] = true
-			}
-		}
-	}
-	if present["poi"] {
-		out = append(out, LegendEntry{"poi", hex(poiColor)})
-	}
-	if len(doc.Zones) > 0 {
-		out = append(out, LegendEntry{"anchor", hex(anchorColor)})
+	if len(field.POIs()) > 0 {
+		out = append(out, LegendEntry{"poi", hex(poiColor), "pin"})
 	}
 	return out
 }
@@ -99,6 +96,9 @@ func hex(c color.RGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.
 // Options configures rendering.
 type Options struct {
 	Scale int // pixels per tile (default 8)
+	// MarkAnchors draws each zone's anchor as a dark square: handy when the
+	// PNG stands alone (CLIs). The web UI numbers its zones itself instead.
+	MarkAnchors bool
 }
 
 // Render draws the map to an RGBA image.
@@ -125,20 +125,58 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 				base = blend(base, boundaryColor, 0.45)
 			}
 			fill(img, x, y, scale, base)
-		}
-	}
-
-	// Mark zone anchors and explicit points of interest.
-	for zi := range doc.Zones {
-		z := &doc.Zones[zi]
-		marker(img, z.Anchor.X, z.Anchor.Y, scale, anchorColor)
-		for _, poi := range z.PointsOfInterest {
-			if !poi.Position.Scattered {
-				marker(img, poi.Position.X, poi.Position.Y, scale, poiColor)
+			if texturedReliefs[field.ReliefAt(x, y)] == "masonry" && !field.BuildingAt(x, y) && scale >= 4 {
+				masonry(img, x, y, scale, blend(base, boundaryColor, 0.3))
 			}
 		}
 	}
+
+	if opts.MarkAnchors {
+		for _, z := range doc.Zones {
+			marker(img, z.Anchor.X, z.Anchor.Y, scale, anchorColor)
+		}
+	}
+	// Every point of interest actually placed, scattered ones included.
+	for _, p := range field.POIs() {
+		pin(img, p[0], p[1], scale)
+	}
 	return img
+}
+
+// masonry draws a stone-joint pattern over a tile: its top and left edges,
+// plus a half-offset vertical joint, so ruins read as laid stone.
+func masonry(img *image.RGBA, tx, ty, scale int, joint color.RGBA) {
+	x0, y0 := tx*scale, ty*scale
+	for i := 0; i < scale; i++ {
+		img.SetRGBA(x0+i, y0, joint)
+		img.SetRGBA(x0, y0+i, joint)
+		img.SetRGBA(x0+i, y0+scale/2, joint)
+	}
+	for i := scale / 2; i < scale; i++ {
+		img.SetRGBA(x0+scale/2, y0+i, joint)
+	}
+}
+
+// pin draws a point of interest as a light disc with a dark ring, centred on
+// its tile, so it stands out by value and shape rather than by hue.
+func pin(img *image.RGBA, tx, ty, scale int) {
+	cx, cy := float64(tx*scale)+float64(scale)/2, float64(ty*scale)+float64(scale)/2
+	r := float64(scale)/2 + 1.5
+	b := img.Bounds()
+	for x := int(cx - r - 1); x <= int(cx+r+1); x++ {
+		for y := int(cy - r - 1); y <= int(cy+r+1); y++ {
+			if x < b.Min.X || y < b.Min.Y || x >= b.Max.X || y >= b.Max.Y {
+				continue
+			}
+			dx, dy := float64(x)+.5-cx, float64(y)+.5-cy
+			switch d := dx*dx + dy*dy; {
+			case d <= (r-1.6)*(r-1.6):
+				img.SetRGBA(x, y, poiColor)
+			case d <= r*r:
+				img.SetRGBA(x, y, poiRingColor)
+			}
+		}
+	}
 }
 
 // WritePNG renders and encodes to w.

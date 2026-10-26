@@ -49,3 +49,24 @@ func TestSeparateZonesNotStamped(t *testing.T) {
 		t.Errorf("expected a roughly even split, got %v", counts)
 	}
 }
+
+// A zone's label must sit on its own tiles: the clearing's anchor lies in the
+// pond stamped at its centre, so numbering it there would point at the pond.
+func TestLabelPointsStayInTheirZone(t *testing.T) {
+	doc := mustParse(t, `{
+		"map":{"width":40,"length":40,"name":"t","biome":"temperate_forest"},
+		"zones":[
+			{"id":"clearing","anchor":{"x":20,"y":20},"relative_size":0.7,"elevation":"flat"},
+			{"id":"pond","anchor":{"x":20,"y":20},"relative_size":0.12,"elevation":"depression","relief_override":"water"}
+		]}`)
+	m := Resolve(doc)
+	labels := m.LabelPoints()
+	for zi, p := range labels {
+		if got := m.ZoneIndexAt(p[0], p[1]); got != zi {
+			t.Errorf("zone %d labelled at (%d,%d), which belongs to zone %d", zi, p[0], p[1], got)
+		}
+	}
+	if labels[1] != [2]int{20, 20} {
+		t.Errorf("the pond's label should stay at its centre (20,20), got %v", labels[1])
+	}
+}

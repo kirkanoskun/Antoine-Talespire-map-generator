@@ -5,20 +5,54 @@
 (() => {
   const realFetch = window.fetch.bind(window);
 
+  // The engine's uncompressed size, so the UI can show download progress even
+  // when the host compresses it (Content-Length is then the compressed size).
+  const WASM_BYTES = 0; // set by scripts/build-web.sh
+
+  // The UI listens for cartographe:progress / :ready / :failed events; the
+  // latest state is also kept on window for a listener that arrives late.
+  const engine = window.cartographeEngine = { state: 'loading', loaded: 0, total: WASM_BYTES };
+  const report = (state, extra = {}) => {
+    Object.assign(engine, { state }, extra);
+    window.dispatchEvent(new CustomEvent('cartographe:' + state, { detail: { ...engine } }));
+  };
+
+  // Counts the bytes of one branch of the response as they arrive.
+  async function track(body) {
+    const reader = body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      engine.loaded += value.byteLength;
+      report('progress');
+    }
+  }
+
+  async function instantiate(go) {
+    const res = await realFetch('/app.wasm');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (WebAssembly.instantiateStreaming && res.body && typeof res.body.tee === 'function') {
+      const [compile, count] = res.body.tee();
+      track(count).catch(() => {});
+      try {
+        return await WebAssembly.instantiateStreaming(
+          new Response(compile, { headers: { 'Content-Type': 'application/wasm' } }), go.importObject);
+      } catch {
+        // Fall through: refetch and compile from a buffer below.
+      }
+    }
+    const buf = await (await realFetch('/app.wasm')).arrayBuffer();
+    engine.loaded = buf.byteLength; report('progress');
+    return WebAssembly.instantiate(buf, go.importObject);
+  }
+
   // Start loading the engine immediately; requests wait for it.
   const ready = new Promise((resolve, reject) => {
-    window.__cartographeReady = resolve;
-    window.__cartographeFailed = (msg) => reject(new Error(msg));
+    window.__cartographeReady = () => { report('ready'); resolve(); };
+    window.__cartographeFailed = (msg) => { report('failed'); reject(new Error(msg)); };
     const go = new Go();
-    const load = WebAssembly.instantiateStreaming
-      ? WebAssembly.instantiateStreaming(realFetch('/app.wasm'), go.importObject)
-          // A host serving .wasm with the wrong MIME type breaks streaming only.
-          .catch(() => realFetch('/app.wasm').then((r) => r.arrayBuffer())
-            .then((buf) => WebAssembly.instantiate(buf, go.importObject)))
-      : realFetch('/app.wasm').then((r) => r.arrayBuffer())
-          .then((buf) => WebAssembly.instantiate(buf, go.importObject));
-    load.then((result) => go.run(result.instance))
-      .catch((err) => reject(new Error("le moteur de génération n'a pas pu se charger (" + err.message + ')')));
+    instantiate(go).then((result) => go.run(result.instance))
+      .catch((err) => window.__cartographeFailed("le moteur de génération n'a pas pu se charger (" + err.message + ')'));
   });
 
   let lastPreview = null;

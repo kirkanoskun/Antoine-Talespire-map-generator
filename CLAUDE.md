@@ -204,11 +204,16 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   with adaptive thinking.
 - **Slicing for TaleSpire's ~30 kB limit (Phase 5).** A slab over ~30 kB pastes
   but fails on save / board switch. `Generate` always produces the whole-map
-  `Code` (and warns if it's oversized); with `SetSliceSize(n)` it also returns a
-  grid of slabs of ≤ n tiles per side (`Result.Slices`), each rebased to its own
-  local origin so they paste adjacent. Coordinates deferred as `placement`s make
-  this a pure re-bucketing — single-slab output is byte-identical whether or not
-  slicing is enabled.
+  `Code`; with `SetSliceSize(n)` it also returns a grid of slabs of ≤ n tiles per
+  side (`Result.Slices`, `Result.SliceSize`), each rebased to its own local
+  origin so they paste adjacent. Coordinates deferred as `placement`s make this
+  a pure re-bucketing — single-slab output is byte-identical whether or not
+  slicing is enabled. **Slicing is automatic by default** (`-slice 0`, the
+  website and desktop app alike): only when the whole map is over the limit, at
+  the largest size whose every slab stays under 27 kB (a margin, since the
+  limit is only "about 30 kB"), shrinking by quarters from an even-spread guess.
+  A 200×200 map comes out as 4×4 slabs, all under 15 kB. Only a slice still too
+  dense at the 8-tile floor (a big building) is reported as a warning.
 
 ### Phase 4 web UI & iteration notes
 
@@ -248,6 +253,24 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   for the brand and the map's cartouche only. The flow survives reloads and app
   switches (`sessionStorage`) and the browser Back button (`history` per step).
   `.impeccable/critique/` keeps the critique snapshots and their scores.
+- **The preview shows what the slab contains.** Every placed point of interest
+  is drawn, scattered ones included (`HeightField.POIs`), as a light pin with a
+  dark ring (value and shape, not hue); ruins carry a masonry texture and paths a
+  distinct sand, since height shading brings stone colours together. Zones are
+  numbered by the UI at `Mask.LabelPoints` (returned as `labels`): the tile
+  nearest each anchor at least 4 tiles inside the zone, so a courtyard is not
+  numbered in its pond. CLIs keep the old dark anchor squares
+  (`preview.Options.MarkAnchors`). Sliced maps draw their piece boundaries and
+  numbers over the preview, matching the copy buttons.
+- **Retouching stays plain language.** Step 4's "Retoucher la carte" turns a
+  request ("déplace la mare plus au sud") into a message carrying the current IR
+  for the visitor's AI, whose new reply is pasted back; with a key (desktop) it
+  calls `/api/adjust` directly. Raw JSON editing is the secondary path.
+- **The engine's first download is visible.** `web/cartographe.js` tees the
+  `app.wasm` stream to count bytes and emits `cartographe:progress/ready/failed`;
+  `build-web.sh` writes the uncompressed size into it (Cloudflare serves the
+  14 MB engine Brotli-compressed, ~2.8 MB on the wire, so Content-Length can't
+  be the total). The UI shows a progress line only if loading takes > 0.6 s.
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.
@@ -266,9 +289,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   as its icon. The `.icns` is committed at `assets/icon.icns` and generated from
   `assets/logo.png` by `scripts/make-icns.py` (Pillow, no Xcode Command Line
   Tools needed); `build-mac.sh` copies it into the bundle and sets
-  `CFBundleIconFile` (still builds without it). The same logo lives in the web UI
-  — the emblem in the header mark and the full badge as the landing hero —
-  served from `internal/server/static/` via the `/static/` route.
+  `CFBundleIconFile` (still builds without it). The web UI shows the emblem in
+  its header (served from `internal/server/static/` via the `/static/` route);
+  the full badge no longer heads the landing page, which leads with the form.
 - **macOS build is host-arch by default.** `build-mac.sh` detects the host
   architecture (`uname -m`) and builds only that, so it needs nothing but the Go
   toolchain (no `lipo`/Command Line Tools). `--universal` still fuses an
@@ -349,6 +372,11 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **Order of operations.** shapeTerrain → transitions + height smoothing →
   carve paths → place ground/props/POIs. Paths override the smoothed heights so
   the corridor is crisp; props are skipped on it.
+- **Paths never pave water.** A path stops at the shore, so a pond stays a pond.
+  It used to cross it as a dry causeway whenever it started at a container
+  zone's anchor, which sits in the zone nested at its centre (a courtyard
+  around its pond); such an endpoint now takes its height from a tile the zone
+  owns (`Mask.LabelPoints`).
 
 ### Open risks (from the brief)
 

@@ -181,10 +181,12 @@ type genResponse struct {
 	IR         json.RawMessage       `json:"ir"`
 	Code       string                `json:"code"`
 	Slices     [][]string            `json:"slices,omitempty"`
+	SliceSize  int                   `json:"slice_size,omitempty"`
 	Warnings   []string              `json:"warnings"`
 	Attempts   int                   `json:"attempts"`
 	PreviewURL string                `json:"preview_url"`
 	Legend     []preview.LegendEntry `json:"legend"`
+	Labels     [][2]int              `json:"labels"` // per zone, the tile to number it on
 }
 
 // Error kinds let the UI explain a rejected map in the user's language; the
@@ -408,10 +410,12 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 		IR:         irJSON,
 		Code:       res.Code,
 		Slices:     res.Slices,
+		SliceSize:  res.SliceSize,
 		Warnings:   res.Warnings,
 		Attempts:   attempts,
 		PreviewURL: fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),
 		Legend:     preview.Legend(doc, res.Height),
+		Labels:     mask.LabelPoints(),
 	})
 }
 

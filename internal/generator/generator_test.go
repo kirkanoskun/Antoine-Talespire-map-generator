@@ -3,7 +3,6 @@ package generator
 import (
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/johnfercher/talescoder/pkg/decoder"
@@ -172,9 +171,10 @@ func TestSlicingProducesDecodableGrid(t *testing.T) {
 	}
 }
 
-// TestOversizedSlabWarns checks that a whole-map slab over TaleSpire's ~30 kB
-// limit is flagged when slicing is off.
-func TestOversizedSlabWarns(t *testing.T) {
+// TestOversizedMapIsSlicedAutomatically checks that with no slice size set, a
+// map too big for one TaleSpire slab is cut into slabs that each fit, without
+// losing a placement, while a small map stays a single slab.
+func TestOversizedMapIsSlicedAutomatically(t *testing.T) {
 	doc, err := ir.Parse([]byte(`{
 		"map":{"width":110,"length":110,"name":"t","biome":"temperate_forest"},
 		"zones":[{"id":"a","anchor":{"x":55,"y":55},"relative_size":1.0,"elevation":"hill"}]}`))
@@ -186,16 +186,46 @@ func TestOversizedSlabWarns(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res.Code) <= TaleSpireSlabLimitBytes {
-		t.Skipf("map not large enough to exceed the limit (%d bytes)", len(res.Code))
+		t.Fatalf("map not large enough to exceed the limit (%d bytes)", len(res.Code))
 	}
-	found := false
-	for _, w := range res.Warnings {
-		if strings.Contains(w, "limit") {
-			found = true
+	if res.Slices == nil || res.SliceSize <= 0 {
+		t.Fatalf("an oversized map must be sliced, got %d slices of %d tiles", len(res.Slices), res.SliceSize)
+	}
+	dec := decoder.NewDecoder()
+	layouts := 0
+	for sx := range res.Slices {
+		for sy, code := range res.Slices[sx] {
+			if len(code) > TaleSpireSlabLimitBytes {
+				t.Errorf("slice [%d,%d] is %d bytes, over the limit", sx, sy, len(code))
+			}
+			slab, err := dec.Decode(code)
+			if err != nil {
+				t.Fatalf("slice [%d,%d] did not decode: %v", sx, sy, err)
+			}
+			for _, a := range slab.Assets {
+				layouts += len(a.Layouts)
+			}
 		}
 	}
-	if !found {
-		t.Errorf("expected an oversize warning, got %v", res.Warnings)
+	if layouts != res.AssetCount {
+		t.Errorf("slices hold %d layouts, whole map has %d assets", layouts, res.AssetCount)
+	}
+	if len(res.Warnings) != 0 {
+		t.Errorf("no warning expected once every slice fits, got %v", res.Warnings)
+	}
+
+	small, err := ir.Parse([]byte(`{
+		"map":{"width":30,"length":30,"name":"t","biome":"temperate_forest"},
+		"zones":[{"id":"a","anchor":{"x":15,"y":15},"relative_size":1.0,"elevation":"flat"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = newTestGen(t).Generate(small, spatial.Resolve(small), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Slices != nil || res.SliceSize != 0 {
+		t.Errorf("a map that fits must stay one slab, got %d slices", len(res.Slices))
 	}
 }
 
@@ -361,5 +391,34 @@ func TestReliefOverrideBeatsElevationRelief(t *testing.T) {
 	}
 	if res.Height.IsWaterAt(15, 15) {
 		t.Error("relief_override 'ground' should prevent water in a depression")
+	}
+}
+
+// A path from a courtyard to ruins must not pave the pond nested at the
+// courtyard's centre: the courtyard's anchor lies in the pond, and the path
+// used to run from there as a dry causeway.
+func TestPathStopsAtWater(t *testing.T) {
+	doc, err := ir.Parse([]byte(`{
+		"map":{"width":50,"length":50,"name":"t","biome":"temperate_forest"},
+		"zones":[
+			{"id":"courtyard","anchor":{"x":25,"y":28},"relative_size":0.4,"elevation":"flat"},
+			{"id":"pond","anchor":{"x":25,"y":28},"relative_size":0.1,"elevation":"depression","relief_override":"water"},
+			{"id":"ruins","anchor":{"x":25,"y":7},"relative_size":0.2,"elevation":"hill","relief_override":"ruins"}
+		],
+		"connections":[{"from":"courtyard","to":"ruins","type":"path","width":3}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mask := spatial.Resolve(doc)
+	res, err := newTestGen(t).Generate(doc, mask, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for x := 0; x < 50; x++ {
+		for y := 0; y < 50; y++ {
+			if mask.ZoneIndexAt(x, y) == 1 && !res.Height.IsWaterAt(x, y) {
+				t.Fatalf("pond tile (%d,%d) is %q, not water", x, y, res.Height.ReliefAt(x, y))
+			}
+		}
 	}
 }
