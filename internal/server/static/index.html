@@ -101,6 +101,8 @@
 
   .err{color:var(--danger-ink); background:var(--danger-bg); border:1px solid var(--danger-line); border-radius:10px;
     padding:14px 16px; margin-top:16px; font-size:14px}
+  .err.info{color:var(--ink); background:var(--panel); border-color:var(--control)}
+  .err.info .err-title{color:var(--ink)}
   .err p{margin:0 0 6px}
   .err .err-title{font-weight:600; color:#f8d3c7}
   .err blockquote{margin:10px 0; padding:10px 12px; background:var(--bg-2); border-radius:8px; color:var(--ink)}
@@ -142,6 +144,8 @@
   .zones{margin:0; padding:0; list-style:none; display:grid; gap:12px; font-size:14px}
   .zones li{display:grid; grid-template-columns:24px 1fr; gap:10px}
   .zones .zone-badge{position:static; margin:0}
+  .legend .legend-badge{position:static; margin:0; width:16px; height:16px; line-height:16px; font-size:10px; box-shadow:none; flex:none}
+  .export .err{margin:0 0 14px}
   .zones small{display:block; color:var(--muted); font-size:13px}
   .warnings{margin:24px 0 0; padding-left:20px; color:var(--muted); font-size:14px}
   .slices{display:grid; gap:6px; margin-top:12px}
@@ -212,6 +216,7 @@
     <textarea id="desc" aria-describedby="descErr" aria-keyshortcuts="Control+Enter Meta+Enter"
       placeholder="Ex. Une cour de château en ruines, une mare au sud, des vestiges au nord…"></textarea>
     <div class="err" id="descErr" role="alert" hidden></div>
+    <p class="note" id="undoWrap"><button class="link" id="undoExample" hidden>Exemple appliqué. Rétablir mon texte</button></p>
 
     <div class="actions">
       <button class="primary large" id="genPrompt">Préparer le prompt →</button>
@@ -266,6 +271,7 @@
           </select>
         </div>
       </div>
+      <p class="note">Au-delà d’environ 70 × 70 cases, la carte risque de dépasser la limite de 30 ko de TaleSpire.</p>
     </details>
   </section>
 
@@ -332,6 +338,7 @@
       </figure>
       <div class="side">
         <div class="panel export">
+          <div class="err" id="oversize" hidden></div>
           <button class="primary large" id="copyCode">Copier le code TaleSpire</button>
           <p>Dans TaleSpire, ouvrez un plateau (board), puis collez avec <b>Ctrl + V</b> (<b>Cmd + V</b> sur Mac).</p>
           <div id="slicesWrap" hidden>
@@ -371,6 +378,7 @@
   </section>
 </main>
 
+<p class="sr-only" id="liveStatus" role="status" aria-live="polite"></p>
 <footer class="site-footer">
   Le Cartographe · <a href="/static/mentions-legales.html">Mentions légales</a> ·
   <a href="https://github.com/kirkanoskun/Antoine-Talespire-map-generator" rel="noopener">Code source</a>
@@ -394,6 +402,7 @@ const POI_NAMES = {broken_pillar: 'colonne brisée', pillar: 'pilier', column: '
 const REPLY_ERRORS = {
   empty: ['Collez d’abord la réponse de l’IA.', 'Copiez toute sa réponse finale, puis collez-la dans le champ ci-dessus.'],
   no_json: ['Aucune carte trouvée dans ce texte.', 'L’IA a peut-être seulement posé ses questions : répondez-y, puis collez sa réponse suivante. Si elle a bien donné une carte, recopiez toute sa réponse, jusqu’à la dernière accolade « } ».'],
+  questions: ['L’IA attend vos réponses à ses questions.', 'Répondez-lui dans la conversation, puis collez ici sa réponse suivante, celle qui contient la carte.'],
   bad_json: ['La carte collée est incomplète ou abîmée.', 'Il en manque sans doute la fin. Recopiez toute la réponse de l’IA, ou envoyez-lui le message ci-dessous.'],
   invalid_map: ['L’IA a décrit une carte que le Cartographe ne sait pas construire.', 'Envoyez-lui le message ci-dessous : elle corrigera sa réponse, qu’il suffira de recoller ici.'],
   engine: ['Le moteur de génération ne répond pas.', 'Rechargez la page puis réessayez : votre texte est conservé.'],
@@ -463,8 +472,13 @@ function selectContents(el){
 async function busy(btn, label, work){
   const idle = btn.textContent;
   btn.disabled = true; btn.textContent = label;
-  try { await work(); } finally { btn.disabled = false; btn.textContent = idle; }
+  try { await work(); } finally {
+    btn.disabled = false; btn.textContent = idle;
+    // Disabling the focused button dropped focus to <body>: give it back.
+    if (document.activeElement === document.body && !btn.closest('[hidden]')) btn.focus();
+  }
 }
+function announce(message){ $('liveStatus').textContent = ''; setTimeout(() => { $('liveStatus').textContent = message; }, 50); }
 function onCtrlEnter(el, action){
   el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); action(); } });
 }
@@ -475,7 +489,15 @@ for (const [id, key] of [['desc', 'desc'], ['w', 'w'], ['l', 'l'], ['biome', 'bi
   $(id).addEventListener('input', () => { state[key] = id === 'w' || id === 'l' ? +$(id).value : $(id).value; save(); });
 }
 for (const c of $('examples').querySelectorAll('.chip')){
-  c.onclick = () => { $('desc').value = c.textContent.trim(); state.desc = $('desc').value; save(); showDescErr(''); $('desc').focus(); };
+  c.onclick = () => {
+    const previous = $('desc').value.trim();
+    $('desc').value = c.textContent.trim(); state.desc = $('desc').value; save(); showDescErr('');
+    // Never lose a description typed by hand without a way back.
+    const undo = $('undoExample');
+    undo.hidden = !previous || previous === state.desc || [...$('examples').children].some((x) => x.textContent.trim() === previous);
+    undo.onclick = () => { $('desc').value = previous; state.desc = previous; save(); undo.hidden = true; $('desc').focus(); };
+    $('desc').focus();
+  };
 }
 async function preparePrompt(){
   const description = $('desc').value.trim();
@@ -522,22 +544,27 @@ $('backTo1').onclick = () => setStep(1);
 $('goTo3').onclick = () => setStep(3);
 
 // Step 3: paste the reply; the server finds the map inside it.
-function showReplyErr(err){
-  const kind = REPLY_ERRORS[err.kind] ? err.kind : 'engine';
+function showReplyErr(err, pasted = ''){
+  let kind = REPLY_ERRORS[err.kind] ? err.kind : 'engine';
+  // The AI asking its three questions is the expected first reply, not an error.
+  if (kind === 'no_json' && pasted.includes('?')) kind = 'questions';
+  $('jsonErr').classList.toggle('info', kind === 'questions');
   const [title, help] = REPLY_ERRORS[kind];
   $('errTitle').textContent = title;
   $('errHelp').textContent = help;
   const fixable = kind === 'invalid_map' || kind === 'bad_json';
   $('errFix').hidden = !fixable;
-  $('errFixText').textContent = fixable
-    ? `Le Cartographe a refusé cette carte : « ${err.message} ». Corrigez le JSON et renvoyez-le en entier, sans autre texte.`
-    : '';
-  $('errDetails').hidden = !err.message;
+  $('errFixText').textContent = kind === 'bad_json'
+    ? 'Votre réponse a été coupée avant la fin. Renvoyez le bloc JSON complet, d’un seul tenant, sans autre texte.'
+    : kind === 'invalid_map'
+      ? `Le Cartographe a refusé cette carte pour la raison suivante : « ${err.message} ». Corrigez-la et renvoyez le JSON complet, sans autre texte.`
+      : '';
+  $('errDetails').hidden = !err.message || kind === 'questions';
   $('errDetail').textContent = err.message || '';
   $('jsonErr').hidden = false;
 }
 $('copyFix').onclick = async () => {
-  if (await copyText($('errFixText').textContent)) flash($('copyFix'), 'Message copié ✓', 'Copier ce message pour l’IA');
+  if (await copyText($('errFixText').textContent)){ flash($('copyFix'), 'Message copié ✓', 'Copier ce message pour l’IA'); announce('Message copié.'); }
   else selectContents($('errFixText'));
 };
 $('jsonIn').addEventListener('input', () => { state.reply = $('jsonIn').value; save(); });
@@ -551,7 +578,7 @@ async function drawMap(){
       state.reply = text; save();
       renderMap(result);
       setStep(4);
-    } catch (e) { showReplyErr(e); }
+    } catch (e) { showReplyErr(e, text); }
   });
 }
 $('drawMap').onclick = drawMap;
@@ -624,7 +651,12 @@ function renderMap(data){
   // Legend, straight from the colours the server actually drew.
   $('legend').replaceChildren(...(data.legend || []).map((entry) => {
     const li = el('li');
-    const sw = el('span', {className: 'swatch'}); sw.style.background = entry.color;
+    // Zone centres are shown as the numbered badges, so show a badge here too.
+    const sw = entry.key === 'anchor'
+      ? el('span', {className: 'zone-badge legend-badge'}, '1')
+      : el('span', {className: 'swatch'});
+    if (entry.key !== 'anchor') sw.style.background = entry.color;
+    sw.setAttribute('aria-hidden', 'true');
     li.append(sw, LEGEND_NAMES[entry.key] || entry.key);
     return li;
   }));
@@ -654,17 +686,25 @@ function renderMap(data){
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
       const b = el('button', {className: 'ghost'}, `${y * cols + x + 1}`);
       b.setAttribute('aria-label', `Copier le morceau ligne ${y + 1}, colonne ${x + 1}`);
-      b.onclick = async () => { if (await copyText(slices[x][y])) flash(b, '✓', `${y * cols + x + 1}`); };
+      b.onclick = async () => { if (await copyText(slices[x][y])){ flash(b, '✓', `${y * cols + x + 1}`); announce(`Morceau ${y * cols + x + 1} copié.`); } };
       grid.appendChild(b);
     }
   }
-  const warnings = (data.warnings || []).map(frenchWarning);
+  // A map over TaleSpire's slab limit pastes but fails on save: say so
+  // where the copy button is, not in a footnote.
+  const heavy = (data.warnings || []).map((w) => w.match(/^slab is (\d+) bytes/)).find(Boolean);
+  $('oversize').hidden = !heavy;
+  if (heavy){
+    $('oversize').textContent = `Carte trop lourde pour TaleSpire : ${Math.round(heavy[1] / 1000)} ko pour une limite d’environ 30 ko. Elle se collera, mais le plateau risque de ne pas s’enregistrer. Réduisez sa taille dans les options avancées (60 × 60 cases par exemple), puis redemandez la carte.`;
+    if (!slices.length){ $('copyCode').className = 'ghost large'; $('copyCode').textContent = 'Copier quand même'; }
+  }
+  const warnings = (data.warnings || []).filter((w) => !/^slab is /.test(w)).map(frenchWarning);
   $('mapWarnings').replaceChildren(...warnings.map((t) => el('li', {}, t)));
   $('warningsWrap').hidden = !warnings.length;
 }
 $('copyCode').onclick = async () => {
   const idle = $('copyCode').textContent;
-  if (await copyText((result && result.code) || '')) flash($('copyCode'), 'Code copié ✓', idle);
+  if (await copyText((result && result.code) || '')){ flash($('copyCode'), 'Code copié ✓', idle); announce('Code TaleSpire copié.'); }
   else { $('codeBox').parentElement.open = true; selectContents($('codeBox')); }
 };
 $('editReply').onclick = () => setStep(3);
@@ -724,7 +764,7 @@ if (state.step === 4 && state.reply){
   setStep(3, {push: false, focus: false});
   postJSON('/api/generate', {text: state.reply})
     .then((data) => { result = data; renderMap(data); setStep(4, {push: false, focus: false}); })
-    .catch(showReplyErr);
+    .catch((e) => showReplyErr(e, state.reply));
 } else {
   setStep(state.step, {push: false, focus: false});
 }
