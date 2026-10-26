@@ -6,6 +6,7 @@
 package preview
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -31,8 +32,69 @@ var (
 	boundaryColor  = color.RGBA{25, 25, 25, 255}
 	poiColor       = color.RGBA{240, 60, 200, 255}
 	anchorColor    = color.RGBA{20, 20, 20, 255}
+	buildingColor  = color.RGBA{195, 142, 65, 255}
 	fallbackRelief = color.RGBA{150, 150, 150, 255}
 )
+
+// reliefOrder fixes the legend order of the known reliefs (the palette is a
+// map, and output must not depend on map iteration).
+var reliefOrder = []string{"water", "ground", "base_ground", "mountain", "ruins"}
+
+// LegendEntry is one swatch of the preview's key: what a colour stands for.
+// Key is a relief key, "other" (a relief outside the palette), "building",
+// "poi" or "anchor"; the UI translates it. Color is the unshaded "#rrggbb".
+type LegendEntry struct {
+	Key   string `json:"key"`
+	Color string `json:"color"`
+}
+
+// Legend lists, in a fixed order, the colours that actually appear in the
+// preview of this map, so the UI can explain the image without guessing.
+func Legend(doc *ir.IR, field *generator.HeightField) []LegendEntry {
+	present := map[string]bool{}
+	for x := 0; x < field.Width; x++ {
+		for y := 0; y < field.Length; y++ {
+			switch {
+			case field.BuildingAt(x, y):
+				present["building"] = true
+			default:
+				if _, ok := reliefPalette[field.ReliefAt(x, y)]; ok {
+					present[field.ReliefAt(x, y)] = true
+				} else {
+					present["other"] = true
+				}
+			}
+		}
+	}
+	var out []LegendEntry
+	for _, key := range reliefOrder {
+		if present[key] {
+			out = append(out, LegendEntry{key, hex(reliefPalette[key])})
+		}
+	}
+	if present["other"] {
+		out = append(out, LegendEntry{"other", hex(fallbackRelief)})
+	}
+	if present["building"] {
+		out = append(out, LegendEntry{"building", hex(buildingColor)})
+	}
+	for _, z := range doc.Zones {
+		for _, poi := range z.PointsOfInterest {
+			if !poi.Position.Scattered {
+				present["poi"] = true
+			}
+		}
+	}
+	if present["poi"] {
+		out = append(out, LegendEntry{"poi", hex(poiColor)})
+	}
+	if len(doc.Zones) > 0 {
+		out = append(out, LegendEntry{"anchor", hex(anchorColor)})
+	}
+	return out
+}
+
+func hex(c color.RGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }
 
 // Options configures rendering.
 type Options struct {
@@ -54,7 +116,7 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 		for y := 0; y < l; y++ {
 			base := colorFor(field, x, y)
 			if field.BuildingAt(x, y) {
-				base = color.RGBA{195, 142, 65, 255}
+				base = buildingColor
 			}
 			if !field.IsWaterAt(x, y) {
 				base = shade(base, field.HeightAt(x, y), minH, maxH)

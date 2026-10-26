@@ -177,14 +177,23 @@ func (s *Server) handleQuit(w http.ResponseWriter, r *http.Request) {
 }
 
 type genResponse struct {
-	Session    string          `json:"session"`
-	IR         json.RawMessage `json:"ir"`
-	Code       string          `json:"code"`
-	Slices     [][]string      `json:"slices,omitempty"`
-	Warnings   []string        `json:"warnings"`
-	Attempts   int             `json:"attempts"`
-	PreviewURL string          `json:"preview_url"`
+	Session    string                `json:"session"`
+	IR         json.RawMessage       `json:"ir"`
+	Code       string                `json:"code"`
+	Slices     [][]string            `json:"slices,omitempty"`
+	Warnings   []string              `json:"warnings"`
+	Attempts   int                   `json:"attempts"`
+	PreviewURL string                `json:"preview_url"`
+	Legend     []preview.LegendEntry `json:"legend"`
 }
+
+// Error kinds let the UI explain a rejected map in the user's language; the
+// error message itself stays as the technical detail.
+const (
+	errNoJSON  = "no_json"     // the pasted text holds no JSON object at all
+	errBadJSON = "bad_json"    // truncated or malformed JSON
+	errBadMap  = "invalid_map" // well-formed JSON, but not a map we can build
+)
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -291,18 +300,35 @@ func (s *Server) handleAdjust(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGenerate: accept an IR directly (no LLM) — used for the "apply edited
-// IR" path and for scripting. Creates or updates the session.
+// IR" path and for scripting. Creates or updates the session. Instead of ir,
+// text takes an AI assistant's reply exactly as the user pasted it: prose and
+// ```json fences around the object are tolerated, as on the automated path.
 func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Session string          `json:"session"`
 		IR      json.RawMessage `json:"ir"`
+		Text    string          `json:"text"`
 	}
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	doc, err := ir.Parse(req.IR)
+	raw := req.IR
+	if len(raw) == 0 && req.Text != "" {
+		extracted := nl.ExtractJSON(req.Text)
+		if extracted == "" {
+			writeErrorKind(w, http.StatusBadRequest, errNoJSON, "no JSON object found in the pasted text")
+			return
+		}
+		raw = json.RawMessage(extracted)
+	}
+	doc, err := ir.Parse(raw)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		kind := errBadMap
+		var syntax *json.SyntaxError
+		if errors.As(err, &syntax) || errors.Is(err, io.ErrUnexpectedEOF) || len(raw) == 0 {
+			kind = errBadJSON
+		}
+		writeErrorKind(w, http.StatusBadRequest, kind, err.Error())
 		return
 	}
 	s.finish(w, req.Session, doc, 0)
@@ -336,7 +362,7 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 	mask := spatial.Resolve(doc)
 	res, err := s.gen.Generate(doc, mask, s.seed)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeErrorKind(w, http.StatusBadRequest, errBadMap, err.Error())
 		return
 	}
 
@@ -385,6 +411,7 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 		Warnings:   res.Warnings,
 		Attempts:   attempts,
 		PreviewURL: fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),
+		Legend:     preview.Legend(doc, res.Height),
 	})
 }
 
@@ -451,6 +478,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func writeErrorKind(w http.ResponseWriter, status int, kind, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg, "kind": kind})
 }
 
 func newID() (string, error) {

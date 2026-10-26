@@ -145,7 +145,7 @@ func (in *Interpreter) run(ctx context.Context, messages []Message, opts Options
 // validate parses and structurally validates the raw model output, then checks
 // biome/relief coherence against the catalogue.
 func (in *Interpreter) validate(raw string, opts Options) (*ir.IR, error) {
-	jsonText := extractJSON(raw)
+	jsonText := ExtractJSON(raw)
 	if jsonText == "" {
 		return nil, fmt.Errorf("no JSON object found in the response")
 	}
@@ -184,9 +184,10 @@ func (in *Interpreter) validate(raw string, opts Options) (*ir.IR, error) {
 	return doc, nil
 }
 
-// extractJSON pulls the JSON object out of a model response, tolerating stray
-// prose or ```json fences even though the prompt forbids them.
-func extractJSON(raw string) string {
+// ExtractJSON pulls the JSON object out of a model response, tolerating stray
+// prose or ```json fences even though the prompt forbids them. The server uses
+// it too, so a reply pasted by hand is read the same way.
+func ExtractJSON(raw string) string {
 	s := strings.TrimSpace(raw)
 	// Strip a leading ```json / ``` fence and its closing counterpart.
 	if strings.HasPrefix(s, "```") {

@@ -124,6 +124,41 @@ func TestGenerateRejectsInvalidIR(t *testing.T) {
 	}
 }
 
+// Users paste an AI assistant's whole reply, prose and ```json fence included.
+func TestGenerateFromPastedReply(t *testing.T) {
+	h := newServer(t, nil)
+	reply := "Voici votre carte :\n```json\n" + cannedIR + "\n```\nBonne partie !"
+	body, _ := json.Marshal(map[string]string{"text": reply})
+	rec, out := post(t, h, "/api/generate", string(body))
+	if rec.Code != 200 {
+		t.Fatalf("generate status %d: %s", rec.Code, rec.Body.String())
+	}
+	legend, _ := out["legend"].([]any)
+	if len(legend) == 0 {
+		t.Fatalf("no legend in response: %v", out)
+	}
+	last, _ := legend[len(legend)-1].(map[string]any)
+	if last["key"] != "anchor" || !strings.HasPrefix(last["color"].(string), "#") {
+		t.Errorf("legend should end with the zone anchor swatch, got %v", legend)
+	}
+}
+
+// Each rejection carries a kind the UI turns into French guidance.
+func TestGenerateExplainsRejections(t *testing.T) {
+	h := newServer(t, nil)
+	for _, c := range []struct{ body, kind string }{
+		{`{"text":"Je ne peux pas faire de carte."}`, "no_json"},
+		{`{"text":"Voici : {\"map\": {\"width\": 40,"}`, "no_json"}, // no closing brace at all
+		{`{"text":"{\"map\": {\"width\": 40} \"zones\": []}"}`, "bad_json"},
+		{`{"ir":{"map":{"width":0,"length":10,"name":"x","biome":"desert"},"zones":[]}}`, "invalid_map"},
+	} {
+		rec, out := post(t, h, "/api/generate", c.body)
+		if rec.Code != http.StatusBadRequest || out["kind"] != c.kind || out["error"] == "" {
+			t.Errorf("%s: status %d, kind %v, error %v; want 400 %s", c.body, rec.Code, out["kind"], out["error"], c.kind)
+		}
+	}
+}
+
 func TestSessionLRUEviction(t *testing.T) {
 	h := newServer(t, nil)
 	// The first session is never touched again, so it stays least-recently-used.

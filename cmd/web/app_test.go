@@ -86,6 +86,25 @@ func TestGenerateAndPreview(t *testing.T) {
 	}
 }
 
+// Visitors paste the AI assistant's whole reply, prose and ```json fence
+// included; the site must find the map in it and explain the colours it drew.
+func TestPastedReplyIsAccepted(t *testing.T) {
+	doc, err := os.ReadFile("../../testdata/castle.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]string{"text": "Voici la carte :\n```json\n" + string(doc) + "\n```\nBonne partie !"})
+	r := call(handler(t), "POST", "/api/generate", string(body))
+	var out struct {
+		Code   string `json:"code"`
+		Legend []struct{ Key, Color string }
+	}
+	decode(t, r, &out)
+	if r.status != http.StatusOK || out.Code == "" || len(out.Legend) == 0 {
+		t.Fatalf("status %d, code %d chars, legend %v", r.status, len(out.Code), out.Legend)
+	}
+}
+
 // The site and the desktop app must produce the same TaleSpire code for the
 // same IR: one is the other compiled for the browser, with catalogues read from
 // memory instead of disk.
