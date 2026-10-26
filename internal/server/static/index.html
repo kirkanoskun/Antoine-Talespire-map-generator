@@ -225,7 +225,7 @@
     <textarea id="desc" aria-describedby="descErr" aria-keyshortcuts="Control+Enter Meta+Enter"
       placeholder="Ex. Une cour de château en ruines, une mare au sud, des vestiges au nord…"></textarea>
     <div class="err" id="descErr" role="alert" hidden></div>
-    <p class="note" id="undoWrap"><button class="link" id="undoExample" hidden>Exemple appliqué. Rétablir mon texte</button></p>
+    <p class="note" id="undoWrap"><button class="link" id="undoExample" hidden>Exemple appliqué. Rétablir mon texte</button><button class="link" id="undoRestart" hidden>Carte effacée. La rétablir</button></p>
 
     <div class="actions">
       <button class="primary large" id="genPrompt">Préparer le prompt →</button>
@@ -281,6 +281,7 @@
           </select>
         </div>
       </div>
+      <p class="note" id="sizeNote" role="status" hidden>La taille va de 8 à 200 cases : la valeur a été ajustée.</p>
       <p class="note">Une grande carte est découpée en morceaux à coller côte à côte : TaleSpire n’accepte pas plus de 30 ko environ par collage.</p>
     </details>
   </section>
@@ -336,6 +337,7 @@
   <section id="s4" aria-labelledby="mapTitle" hidden>
     <h2 class="cartouche" id="mapTitle" tabindex="-1">Votre carte</h2>
     <p class="map-meta" id="mapMeta"></p>
+    <p class="note" id="revertWrap" style="margin:-16px 0 20px" hidden><button class="link" id="revertMap">Revenir à la carte précédente</button></p>
     <div class="result">
       <figure class="survey" id="survey">
         <div class="survey-corner" title="Le nord est en haut">
@@ -432,7 +434,9 @@ const REPLY_ERRORS = {
 // The flow survives a reload or a trip to the AI's tab (mobile browsers may
 // discard the page meanwhile). sessionStorage can be missing or throw.
 const STORE_KEY = 'cartographe.etat.v1';
-const state = {step: 1, desc: '', w: 50, l: 50, biome: '', prompt: '', copied: false, reply: ''};
+// reply is the step-3 draft; mapReply the reply behind the map on screen, kept
+// apart so a new draft never costs the map; previousReply allows one revert.
+const state = {step: 1, desc: '', w: 50, l: 50, biome: '', prompt: '', copied: false, reply: '', mapReply: '', previousReply: ''};
 let result = null; // last generation, kept in memory only (it holds a blob URL)
 let config = {};    // capabilities reported by /api/config
 function save(){ try { sessionStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} }
@@ -507,6 +511,14 @@ function onCtrlEnter(el, action){
 
 // Step 1: describe, then prepare the prompt.
 function showDescErr(message){ const e = $('descErr'); e.textContent = message; e.hidden = !message; }
+for (const id of ['w', 'l']){
+  // The browser does not enforce min/max on typed values: keep 8 to 200.
+  $(id).addEventListener('change', () => {
+    const v = Math.min(200, Math.max(8, Math.round(+$(id).value) || 50));
+    $('sizeNote').hidden = v === +$(id).value;
+    $(id).value = v; state[id] = v; save();
+  });
+}
 for (const [id, key] of [['desc', 'desc'], ['w', 'w'], ['l', 'l'], ['biome', 'biome']]){
   $(id).addEventListener('input', () => { state[key] = id === 'w' || id === 'l' ? +$(id).value : $(id).value; save(); });
 }
@@ -522,6 +534,7 @@ for (const c of $('examples').querySelectorAll('.chip')){
   };
 }
 async function preparePrompt(){
+  $('undoRestart').hidden = true; cleared = null;
   const description = $('desc').value.trim();
   if (!description){ showDescErr('Décrivez d’abord votre scène, ou partez d’un exemple ci-dessous.'); $('desc').focus(); return; }
   showDescErr('');
@@ -566,10 +579,17 @@ $('backTo1').onclick = () => setStep(1);
 $('goTo3').onclick = () => setStep(3);
 
 // Step 3: paste the reply; the server finds the map inside it.
+// A successful generation becomes the map on screen; the one it replaces can
+// be brought back once.
+function adoptMap(data, reply){
+  if (state.mapReply && state.mapReply !== reply) state.previousReply = state.mapReply;
+  result = data; state.mapReply = reply; save();
+  renderMap(data);
+}
 function showReplyErr(err, pasted = ''){
   let kind = REPLY_ERRORS[err.kind] ? err.kind : 'engine';
   // The AI asking its three questions is the expected first reply, not an error.
-  if (kind === 'no_json' && pasted.includes('?')) kind = 'questions';
+  if (kind === 'no_json' && (pasted.match(/\?/g) || []).length >= 2) kind = 'questions';
   $('jsonErr').classList.toggle('info', kind === 'questions');
   const [title, help] = REPLY_ERRORS[kind];
   $('errTitle').textContent = title;
@@ -596,9 +616,9 @@ async function drawMap(){
   if (!text.trim()){ showReplyErr({kind: 'empty'}); $('jsonIn').focus(); return; }
   await busy($('drawMap'), 'Dessin de la carte…', async () => {
     try {
-      result = await postJSON('/api/generate', {text});
-      state.reply = text; save();
-      renderMap(result);
+      const data = await postJSON('/api/generate', {text});
+      state.reply = text;
+      adoptMap(data, text);
       setStep(4);
     } catch (e) { showReplyErr(e, text); }
   });
@@ -638,6 +658,9 @@ function renderMap(data){
 
   // Map image, survey grid and numbered zone markers.
   const cell = $('mapCell'); cell.replaceChildren();
+  // Reserve the map's shape before the image loads, so nothing collapses.
+  cell.style.aspectRatio = `${w} / ${l}`;
+  $('revertWrap').hidden = !state.previousReply;
   const img = el('img', {src: data.preview_url, alt: `Aperçu vu du dessus de la carte « ${map.name || 'sans nom'} »`});
   cell.appendChild(img);
   const step = gridStep(Math.max(w, l));
@@ -748,11 +771,32 @@ $('copyCode').onclick = async () => {
   else { $('codeBox').parentElement.open = true; selectContents($('codeBox')); }
 };
 $('editReply').onclick = () => setStep(3);
+$('revertMap').onclick = () => busy($('revertMap'), 'Retour…', async () => {
+  const previous = state.previousReply;
+  try {
+    const data = await postJSON('/api/generate', {text: previous});
+    state.reply = previous;
+    adoptMap(data, previous);
+    announce('Carte précédente rétablie.');
+  } catch (e) { $('retouchNote').textContent = 'La carte précédente n’a pas pu être rétablie (' + e.message + ').'; }
+});
+// "Nouvelle carte" clears the flow but keeps one undo, shown on step 1.
+let cleared = null;
 $('restart').onclick = () => {
-  Object.assign(state, {desc: '', prompt: '', copied: false, reply: ''});
+  cleared = {state: {...state}, result};
+  Object.assign(state, {desc: '', prompt: '', copied: false, reply: '', mapReply: '', previousReply: ''});
   result = null; $('desc').value = ''; $('jsonIn').value = '';
   resetRetouch();
+  $('undoRestart').hidden = false;
   setStep(1);
+};
+$('undoRestart').onclick = () => {
+  if (!cleared) return;
+  Object.assign(state, cleared.state); result = cleared.result; cleared = null; save();
+  $('desc').value = state.desc; $('jsonIn').value = state.reply;
+  if (state.prompt) renderPrompt();
+  $('undoRestart').hidden = true;
+  if (result){ renderMap(result); setStep(4); } else setStep(state.step);
 };
 
 // Retouch: the map is edited from a plain-language request, relative to the
@@ -781,8 +825,8 @@ $('retouchBtn').onclick = async () => {
     await busy($('retouchBtn'), 'Retouche en cours…', async () => {
       try {
         const data = await postJSON('/api/adjust', {session: result.session, message: change});
-        result = data; state.reply = JSON.stringify(data.ir); save();
-        renderMap(data); resetRetouch();
+        state.reply = JSON.stringify(data.ir);
+        adoptMap(data, state.reply); resetRetouch();
         $('retouchNote').textContent = 'Carte retouchée.';
       } catch (e) { $('retouchNote').textContent = 'La retouche n’a pas abouti (' + e.message + '). Reformulez la demande puis réessayez.'; }
     });
@@ -799,6 +843,7 @@ $('retouchBtn').onclick = async () => {
   $('retouchNext').hidden = false;
 };
 $('retouchNext').onclick = () => {
+  // Only the draft is emptied: the map on screen stays in mapReply.
   $('jsonIn').value = ''; state.reply = ''; save();
   resetRetouch();
   setStep(3);
@@ -879,14 +924,18 @@ $('desc').value = state.desc; $('w').value = state.w; $('l').value = state.l; $(
 $('jsonIn').value = state.reply;
 if (state.prompt) renderPrompt();
 history.replaceState({step: state.step}, '');
-if (state.step === 4 && state.reply){
-  // The map itself isn't stored: redraw it from the saved reply.
-  setStep(3, {push: false, focus: false});
-  postJSON('/api/generate', {text: state.reply})
-    .then((data) => { result = data; renderMap(data); setStep(4, {push: false, focus: false}); })
-    .catch((e) => showReplyErr(e, state.reply));
-} else {
-  setStep(state.step, {push: false, focus: false});
+if (!state.mapReply && state.step === 4) state.mapReply = state.reply; // saved before mapReply existed
+const wanted = state.step;
+setStep(wanted === 4 ? 3 : wanted, {push: false, focus: false});
+if (state.mapReply){
+  // The map itself isn't stored: redraw it from the reply behind it.
+  postJSON('/api/generate', {text: state.mapReply})
+    .then((data) => {
+      result = data; renderMap(data);
+      // Only return to the map if the visitor has not moved on meanwhile.
+      if (state.step === (wanted === 4 ? 3 : wanted)) setStep(wanted, {push: false, focus: false});
+    })
+    .catch((e) => { if (wanted >= 3) showReplyErr(e, state.mapReply); });
 }
 </script>
 </body>
