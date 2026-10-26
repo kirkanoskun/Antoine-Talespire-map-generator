@@ -28,9 +28,10 @@ var reliefPalette = map[string]color.RGBA{
 	"ruins":       {150, 140, 125, 255},
 }
 
-// texturedReliefs are told apart by pattern as well as colour (ruins and
-// mountain are close in value once height-shaded): the legend reports it.
-var texturedReliefs = map[string]string{"ruins": "masonry"}
+// texturedReliefs are told apart by pattern as well as colour, so the map
+// never relies on hue alone (ruins and mountain are close in value once
+// height-shaded, water and ground in luminance): the legend reports it.
+var texturedReliefs = map[string]string{"ruins": "masonry", "water": "waves", "mountain": "hatch"}
 
 var (
 	boundaryColor  = color.RGBA{25, 25, 25, 255}
@@ -39,6 +40,9 @@ var (
 	anchorColor    = color.RGBA{20, 20, 20, 255}
 	buildingColor  = color.RGBA{195, 142, 65, 255}
 	fallbackRelief = color.RGBA{150, 150, 150, 255}
+	canopyInk      = color.RGBA{14, 22, 10, 255}    // trees: the ground beneath, much darker
+	stoneColor     = color.RGBA{204, 198, 188, 255} // rocks: light, with a dark shadow pixel
+	white          = color.RGBA{255, 255, 255, 255}
 )
 
 // reliefOrder fixes the legend order of the known reliefs (the palette is a
@@ -46,21 +50,26 @@ var (
 var reliefOrder = []string{"water", "ground", "base_ground", "mountain", "ruins"}
 
 // LegendEntry is one swatch of the preview's key: what a colour stands for.
-// Key is a relief key, "other" (a relief outside the palette), "building" or
-// "poi"; the UI translates it. Color is the unshaded "#rrggbb"; Pattern names
-// a texture drawn over it ("masonry"), or for "poi" the "pin" shape.
+// Key is a relief key, "other" (a relief outside the palette), "building",
+// "tree", "stone", "misc", "boundary" or "poi"; the UI translates it. Color is
+// the unshaded "#rrggbb"; Pattern names a texture drawn over it ("masonry",
+// "waves", "hatch") or a symbol ("tree", "stone", "dot", "line", "pin").
+// Count is how many are drawn, for the scatter and points of interest.
 type LegendEntry struct {
 	Key     string `json:"key"`
 	Color   string `json:"color"`
 	Pattern string `json:"pattern,omitempty"`
+	Count   int    `json:"count,omitempty"`
 }
 
 // Legend lists, in a fixed order, the colours that actually appear in the
 // preview of this map, so the UI can explain the image without guessing.
 func Legend(doc *ir.IR, field *generator.HeightField) []LegendEntry {
 	present := map[string]bool{}
+	var props [4]int // per generator.PropKind
 	for x := 0; x < field.Width; x++ {
 		for y := 0; y < field.Length; y++ {
+			props[field.PropAt(x, y)]++
 			switch {
 			case field.BuildingAt(x, y):
 				present["building"] = true
@@ -76,20 +85,36 @@ func Legend(doc *ir.IR, field *generator.HeightField) []LegendEntry {
 	var out []LegendEntry
 	for _, key := range reliefOrder {
 		if present[key] {
-			out = append(out, LegendEntry{key, hex(reliefPalette[key]), texturedReliefs[key]})
+			out = append(out, LegendEntry{key, hex(reliefPalette[key]), texturedReliefs[key], 0})
 		}
 	}
 	if present["other"] {
-		out = append(out, LegendEntry{"other", hex(fallbackRelief), ""})
+		out = append(out, LegendEntry{"other", hex(fallbackRelief), "", 0})
 	}
 	if present["building"] {
-		out = append(out, LegendEntry{"building", hex(buildingColor), ""})
+		out = append(out, LegendEntry{"building", hex(buildingColor), "", 0})
 	}
-	if len(field.POIs()) > 0 {
-		out = append(out, LegendEntry{"poi", hex(poiColor), "pin"})
+	ground := reliefPalette["ground"]
+	if n := props[generator.PropTree]; n > 0 {
+		out = append(out, LegendEntry{"tree", hex(canopy(ground)), "tree", n})
+	}
+	if n := props[generator.PropStone]; n > 0 {
+		out = append(out, LegendEntry{"stone", hex(stoneColor), "stone", n})
+	}
+	if n := props[generator.PropMisc]; n > 0 {
+		out = append(out, LegendEntry{"misc", hex(detail(ground)), "dot", n})
+	}
+	if len(doc.Zones) > 1 {
+		out = append(out, LegendEntry{"boundary", hex(blend(ground, boundaryColor, 0.45)), "line", 0})
+	}
+	if n := len(field.POIs()); n > 0 {
+		out = append(out, LegendEntry{"poi", hex(poiColor), "pin", n})
 	}
 	return out
 }
+
+func canopy(ground color.RGBA) color.RGBA { return blend(ground, canopyInk, 0.55) }
+func detail(ground color.RGBA) color.RGBA { return blend(ground, canopyInk, 0.35) }
 
 func hex(c color.RGBA) string { return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B) }
 
@@ -112,7 +137,9 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 
 	minH, maxH := heightRange(field)
 
+	bases := make([][]color.RGBA, w)
 	for x := 0; x < w; x++ {
+		bases[x] = make([]color.RGBA, l)
 		for y := 0; y < l; y++ {
 			base := colorFor(field, x, y)
 			if field.BuildingAt(x, y) {
@@ -125,8 +152,32 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 				base = blend(base, boundaryColor, 0.45)
 			}
 			fill(img, x, y, scale, base)
-			if texturedReliefs[field.ReliefAt(x, y)] == "masonry" && !field.BuildingAt(x, y) && scale >= 4 {
-				masonry(img, x, y, scale, blend(base, boundaryColor, 0.3))
+			bases[x][y] = base
+			if !field.BuildingAt(x, y) && scale >= 4 {
+				switch texturedReliefs[field.ReliefAt(x, y)] {
+				case "masonry":
+					masonry(img, x, y, scale, blend(base, boundaryColor, 0.3))
+				case "waves":
+					waves(img, x, y, scale, blend(base, white, 0.22))
+				case "hatch":
+					hatch(img, x, y, scale, blend(base, boundaryColor, 0.18))
+				}
+			}
+		}
+	}
+
+	// The scatter the slab actually carries, over the finished ground: tree
+	// canopies overhang their tile (trees are never side by side), which
+	// painting the next tile would otherwise clip.
+	for x := 0; x < w; x++ {
+		for y := 0; y < l; y++ {
+			switch field.PropAt(x, y) {
+			case generator.PropTree:
+				disc(img, x, y, scale, float64(scale)*0.62, canopy(bases[x][y]))
+			case generator.PropStone:
+				stone(img, x, y, scale)
+			case generator.PropMisc:
+				disc(img, x, y, scale, float64(scale)*0.2, detail(bases[x][y]))
 			}
 		}
 	}
@@ -154,6 +205,56 @@ func masonry(img *image.RGBA, tx, ty, scale int, joint color.RGBA) {
 	}
 	for i := scale / 2; i < scale; i++ {
 		img.SetRGBA(x0+scale/2, y0+i, joint)
+	}
+}
+
+// waves draws two short light dashes across a water tile, offset row to row.
+func waves(img *image.RGBA, tx, ty, scale int, c color.RGBA) {
+	x0, y0 := tx*scale, ty*scale
+	off := (ty % 2) * scale / 2
+	for i := 0; i < scale/2; i++ {
+		img.SetRGBA(x0+(off+i)%scale, y0+scale/3, c)
+		img.SetRGBA(x0+(off+scale/2+i)%scale, y0+2*scale/3+1, c)
+	}
+}
+
+// hatch draws diagonal strokes across a tile, continuous from tile to tile,
+// the cartographer's mark for rock.
+func hatch(img *image.RGBA, tx, ty, scale int, c color.RGBA) {
+	x0, y0 := tx*scale, ty*scale
+	for i := 0; i < scale; i++ {
+		for j := 0; j < scale; j++ {
+			if (x0+i+y0+j)%4 == 0 {
+				img.SetRGBA(x0+i, y0+j, c)
+			}
+		}
+	}
+}
+
+// disc fills a circle of radius r centred on a tile.
+func disc(img *image.RGBA, tx, ty, scale int, r float64, c color.RGBA) {
+	cx, cy := float64(tx*scale)+float64(scale)/2, float64(ty*scale)+float64(scale)/2
+	for x := int(cx - r); x <= int(cx+r); x++ {
+		for y := int(cy - r); y <= int(cy+r); y++ {
+			if dx, dy := float64(x)+.5-cx, float64(y)+.5-cy; dx*dx+dy*dy <= r*r && image.Pt(x, y).In(img.Bounds()) {
+				img.SetRGBA(x, y, c)
+			}
+		}
+	}
+}
+
+// stone draws a small light rock with a shadow on its lower right.
+func stone(img *image.RGBA, tx, ty, scale int) {
+	side := max(1, scale*3/8)
+	x0, y0 := tx*scale+(scale-side)/2, ty*scale+(scale-side)/2
+	for i := 0; i < side; i++ {
+		for j := 0; j < side; j++ {
+			img.SetRGBA(x0+i, y0+j, stoneColor)
+		}
+	}
+	for i := 0; i <= side; i++ {
+		img.SetRGBA(x0+i, y0+side, poiRingColor)
+		img.SetRGBA(x0+side, y0+i, poiRingColor)
 	}
 }
 

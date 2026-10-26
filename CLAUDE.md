@@ -256,7 +256,16 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **The preview shows what the slab contains.** Every placed point of interest
   is drawn, scattered ones included (`HeightField.POIs`), as a light pin with a
   dark ring (value and shape, not hue); ruins carry a masonry texture and paths a
-  distinct sand, since height shading brings stone colours together. Zones are
+  distinct sand, since height shading brings stone colours together. The
+  scatter is drawn too (`HeightField.PropAt`, one prop per tile): trees as dark
+  canopies wider than their tile (trees are never side by side, so they are
+  painted after all the ground), rocks as light stones with a shadow, bushes and
+  flowers as small dots; underwater "vegetation" is coral and counts as a
+  detail. A dense wood and a clearing therefore look different
+  (`TestDenseWoodLooksDifferentFromClearing`). Water ripples and rock hatching
+  mean no terrain relies on hue alone. The legend counts what it shows and the
+  zone-border tint is listed; the UI turns those counts into the map's alt
+  text. Zones are
   numbered by the UI at `Mask.LabelPoints` (returned as `labels`): the tile
   nearest each anchor at least 4 tiles inside the zone, so a courtyard is not
   numbered in its pond. CLIs keep the old dark anchor squares
