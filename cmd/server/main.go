@@ -44,7 +44,7 @@ func main() {
 	scale := flag.Int("scale", 8, "preview pixels per tile")
 	seed := flag.Int64("seed", 1, "generation seed")
 	transition := flag.Int("transition", 3, "zone-border stitching half-width (0 = hard)")
-	slice := flag.Int("slice", 0, "slice maps into slabs of at most N tiles per side (0 = single slab)")
+	slice := flag.Int("slice", 0, "slice maps into slabs of at most N tiles per side (0 = automatic, only when a map is over TaleSpire's ~30 kB slab limit)")
 	open := flag.Bool("open", true, "open the web UI in the default browser on start")
 	prefabsPath := flag.String("prefabs", "", "local prefab catalogue (default ~/.talespire/prefabs.json)")
 	flag.Parse()

@@ -103,12 +103,12 @@ func (g *Generator) SetTransitionHalfWidth(tiles int) {
 	g.transitionHalf = tiles
 }
 
-// SetSliceSize sets the tile size of each exported slab slice. Zero (default)
-// emits the whole map as a single slab. A positive value slices the map into a
-// grid of slabs of at most that many tiles per side, each with its own local
-// origin so they paste adjacent in TaleSpire. Slicing is the Phase 5 answer to
-// TaleSpire's ~30 kB per-slab limit (a large single slab fails on save / board
-// switch).
+// SetSliceSize sets the tile size of each exported slab slice. A positive value
+// slices the map into a grid of slabs of at most that many tiles per side, each
+// with its own local origin so they paste adjacent in TaleSpire. Zero (default)
+// slices automatically, and only when the whole map is over TaleSpire's ~30 kB
+// per-slab limit (a larger slab pastes but fails on save / board switch): the
+// largest slice size whose every slab fits is picked.
 func (g *Generator) SetSliceSize(tiles int) {
 	if tiles < 0 {
 		tiles = 0
@@ -124,7 +124,8 @@ const TaleSpireSlabLimitBytes = 30000
 // Result is the output of a generation run.
 type Result struct {
 	Code       string       // base64 TaleSpire slab for the whole map (paste into the game)
-	Slices     [][]string   // grid of per-slice codes when slicing is enabled ([x][y]); nil otherwise
+	Slices     [][]string   // grid of per-slice codes ([x][y]) when the map is sliced; nil otherwise
+	SliceSize  int          // tiles per side of each slice (the last row/column may be smaller); 0 if not sliced
 	AssetCount int          // total assets placed
 	Height     *HeightField // per-tile height/relief, for preview and inspection
 	Warnings   []string     // non-fatal issues (unknown POI props, oversized slabs)
@@ -137,7 +138,12 @@ type HeightField struct {
 	tiles     [][]tile
 	buildings [][]bool
 	dug       [][]bool // ground removed under a building's underground part
+	pois      [][2]int // tiles where a point of interest was actually placed
 }
+
+// POIs returns the tiles where points of interest were placed, scattered ones
+// included, so the preview shows what the slab really contains.
+func (f *HeightField) POIs() [][2]int { return f.pois }
 
 // HeightAt returns the terrain height at (x,y).
 func (h *HeightField) HeightAt(x, y int) int { return h.tiles[x][y].height }
@@ -189,7 +195,7 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 	var paths *spatial.Paths
 	if len(doc.Connections) > 0 {
 		paths = spatial.BuildPaths(doc)
-		g.carvePaths(doc, field, paths)
+		g.carvePaths(doc, field, paths, mask)
 	}
 
 	buildingParts, err := g.placeBuildings(doc, field)
@@ -210,21 +216,63 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		return nil, err
 	}
 	res.Code = code
-	if len(code) > TaleSpireSlabLimitBytes && g.sliceSize == 0 {
-		res.Warnings = append(res.Warnings, fmt.Sprintf(
-			"slab is %d bytes, over TaleSpire's ~%d byte limit; enable slicing (-slice) to export it in pieces",
-			len(code), TaleSpireSlabLimitBytes))
-	}
 
-	// Optional sliced grid for large maps.
-	if g.sliceSize > 0 {
-		slices, err := g.encodeSlices(placements, field.Width, field.Length, res)
+	// Sliced grid: at the configured size, or automatically when the whole map
+	// is too big for one slab.
+	size := g.sliceSize
+	if size == 0 && len(code) > TaleSpireSlabLimitBytes {
+		size = firstSliceGuess(len(code), field.Width, field.Length)
+	}
+	if size == 0 {
+		return res, nil
+	}
+	for {
+		slices, err := g.encodeSlices(placements, field.Width, field.Length, size)
 		if err != nil {
 			return nil, err
 		}
-		res.Slices = slices
+		// Automatic slicing shrinks until every slab fits with a margin, as the
+		// limit is only documented as "about 30 kB"; a slice too dense to fit
+		// even when small (a big building, say) is reported instead.
+		if g.sliceSize == 0 && len(oversizedSlices(slices, autoSliceTarget)) > 0 && size > minAutoSlice {
+			size = max(minAutoSlice, size*3/4)
+			continue
+		}
+		res.Slices, res.SliceSize = slices, size
+		for _, o := range oversizedSlices(slices, TaleSpireSlabLimitBytes) {
+			res.Warnings = append(res.Warnings, fmt.Sprintf(
+				"slice [%d,%d] is %d bytes, over TaleSpire's ~%d byte limit; use a smaller -slice",
+				o[0], o[1], o[2], TaleSpireSlabLimitBytes))
+		}
+		return res, nil
 	}
-	return res, nil
+}
+
+// minAutoSlice is the smallest slice side automatic slicing will try, and
+// autoSliceTarget the slab size it aims below.
+const (
+	minAutoSlice    = 8
+	autoSliceTarget = TaleSpireSlabLimitBytes * 9 / 10
+)
+
+// oversizedSlices lists the slices over limit bytes, as {x, y, bytes}.
+func oversizedSlices(slices [][]string, limit int) [][3]int {
+	var out [][3]int
+	for sx := range slices {
+		for sy, code := range slices[sx] {
+			if len(code) > limit {
+				out = append(out, [3]int{sx, sy, len(code)})
+			}
+		}
+	}
+	return out
+}
+
+// firstSliceGuess estimates the slice side at which each slab fits the limit,
+// assuming bytes spread evenly over the map, with a margin for dense spots.
+func firstSliceGuess(codeBytes, w, l int) int {
+	side := float64(max(w, l)) * math.Sqrt(0.8*autoSliceTarget/float64(codeBytes))
+	return max(minAutoSlice, int(side))
 }
 
 // placement is a deferred asset: a part at a tile with a z and base rotation.
@@ -284,11 +332,9 @@ func (g *Generator) encodeRegion(placements []placement, originX, originY int) (
 	return code, nil
 }
 
-// encodeSlices partitions the map into a grid of slabs of at most sliceSize
-// tiles per side, each with a local origin, and encodes each. Oversized slices
-// are reported as warnings.
-func (g *Generator) encodeSlices(placements []placement, w, l int, res *Result) ([][]string, error) {
-	size := g.sliceSize
+// encodeSlices partitions the map into a grid of slabs of at most size tiles
+// per side, each with a local origin, and encodes each.
+func (g *Generator) encodeSlices(placements []placement, w, l, size int) ([][]string, error) {
 	nx := (w + size - 1) / size
 	ny := (l + size - 1) / size
 
@@ -312,11 +358,6 @@ func (g *Generator) encodeSlices(placements []placement, w, l int, res *Result) 
 				return nil, err
 			}
 			slices[sx][sy] = code
-			if len(code) > TaleSpireSlabLimitBytes {
-				res.Warnings = append(res.Warnings, fmt.Sprintf(
-					"slice [%d,%d] is %d bytes, over TaleSpire's ~%d byte limit; use a smaller -slice",
-					sx, sy, len(code), TaleSpireSlabLimitBytes))
-			}
 		}
 	}
 	return slices, nil
@@ -519,6 +560,7 @@ func (g *Generator) placePOIs(out []placement, doc *ir.IR, mask *spatial.Mask, f
 					res.Warnings = append(res.Warnings, fmt.Sprintf("zone %q: POI %q overlaps a reserved building footprint (skipped)", zone.ID, poi.Prop))
 					continue
 				}
+				f.pois = append(f.pois, [2]int{x, y})
 				rot := randomRotation(rng)
 				for _, part := range prop.Parts {
 					out = append(out, placement{part: part, tileX: x, tileY: y, z: f.tiles[x][y].height + part.OffsetZ, baseRotation: rot})
@@ -536,15 +578,26 @@ const pathRelief = "base_ground"
 // carvePaths turns the path overlay into leveled corridors. Each path tile's
 // height is set to a linear ramp between the two connected zones' anchor heights
 // (so the trail climbs from one to the other) and its relief to bare ground.
-// Endpoint heights are snapshotted before any tile is rewritten.
-func (g *Generator) carvePaths(doc *ir.IR, f *HeightField, paths *spatial.Paths) {
+// Endpoint heights are snapshotted before any tile is rewritten. A path never
+// paves over water: it stops at the shore, so a pond stays a pond.
+func (g *Generator) carvePaths(doc *ir.IR, f *HeightField, paths *spatial.Paths, mask *spatial.Mask) {
 	if !paths.Any() {
 		return
 	}
+	var labels [][2]int
 	anchorHeight := make(map[string]int, len(doc.Zones))
 	for i := range doc.Zones {
 		z := &doc.Zones[i]
-		anchorHeight[z.ID] = f.tiles[z.Anchor.X][z.Anchor.Y].height
+		x, y := z.Anchor.X, z.Anchor.Y
+		// A zone with another nested at its centre (a courtyard around its
+		// pond) does not own its own anchor: take the height of a tile it does.
+		if mask.ZoneIndexAt(x, y) != i {
+			if labels == nil {
+				labels = mask.LabelPoints()
+			}
+			x, y = labels[i][0], labels[i][1]
+		}
+		anchorHeight[z.ID] = f.tiles[x][y].height
 	}
 	type endpoints struct {
 		h0, h1 int
@@ -560,7 +613,7 @@ func (g *Generator) carvePaths(doc *ir.IR, f *HeightField, paths *spatial.Paths)
 
 	for x := 0; x < f.Width; x++ {
 		for y := 0; y < f.Length; y++ {
-			if !paths.On(x, y) {
+			if !paths.On(x, y) || f.IsWaterAt(x, y) {
 				continue
 			}
 			if ci := paths.Conn(x, y); ci >= 0 && eps[ci].ok {

@@ -141,6 +141,15 @@
   .legend{list-style:none; margin:0; padding:0; display:grid; gap:8px; font-size:14px}
   .legend li{display:flex; align-items:center; gap:10px}
   .swatch{width:16px; height:16px; border-radius:4px; flex:none; border:1px solid rgba(240,232,221,.25)}
+  .swatch.pin{border-radius:50%; border:3px solid var(--bg); box-shadow:0 0 0 1px var(--control)}
+  .swatch.masonry{background-image:linear-gradient(rgba(25,25,25,.45) 1px, transparent 1px), linear-gradient(90deg, rgba(25,25,25,.45) 1px, transparent 1px);
+    background-size:8px 8px}
+  .piece-label{position:absolute; margin:4px 0 0 4px; padding:0 5px; border-radius:4px; background:rgba(27,21,17,.8);
+    color:var(--ink); font-size:11px; font-weight:600; line-height:18px}
+  .engine{display:flex; align-items:center; gap:10px; margin:12px 0 0; font-size:13px; color:var(--muted)}
+  .engine progress{width:160px; height:6px; accent-color:var(--accent)}
+  .retouch{margin-top:28px}
+  .retouch textarea{min-height:84px}
   .zones{margin:0; padding:0; list-style:none; display:grid; gap:12px; font-size:14px}
   .zones li{display:grid; grid-template-columns:24px 1fr; gap:10px}
   .zones .zone-badge{position:static; margin:0}
@@ -222,6 +231,7 @@
       <button class="primary large" id="genPrompt">Préparer le prompt →</button>
       <span class="kbd-hint">ou Ctrl + Entrée</span>
     </div>
+    <p class="engine" id="engineStatus" role="status" hidden><span id="engineText">Chargement du moteur de génération…</span><progress id="engineBar" max="1" value="0"></progress></p>
     <p class="note"><button class="link" id="pasteDirect">Vous avez déjà la réponse de l’IA ? Collez-la directement</button></p>
 
     <p class="eyebrow" id="examplesLabel">Pas d’idée ? Partez d’un exemple :</p>
@@ -271,7 +281,7 @@
           </select>
         </div>
       </div>
-      <p class="note">Au-delà d’environ 70 × 70 cases, la carte risque de dépasser la limite de 30 ko de TaleSpire.</p>
+      <p class="note">Une grande carte est découpée en morceaux à coller côte à côte : TaleSpire n’accepte pas plus de 30 ko environ par collage.</p>
     </details>
   </section>
 
@@ -361,8 +371,20 @@
     <div id="warningsWrap" hidden>
       <ul class="warnings" id="mapWarnings"></ul>
     </div>
-    <div class="actions" style="margin-top:32px">
-      <button class="ghost" id="editReply">Modifier la réponse collée</button>
+    <section class="panel retouch" aria-labelledby="retouchTitle">
+      <h3 id="retouchTitle">Retoucher la carte</h3>
+      <p class="note" id="retouchLead" style="margin:0 0 12px">Décrivez le changement comme à votre table : le Cartographe prépare la demande pour votre IA, qui renverra la carte modifiée.</p>
+      <label for="retouchText" class="sr-only">Changement souhaité</label>
+      <textarea id="retouchText" placeholder="Ex. déplace la mare plus au sud, ajoute des arbres morts autour des ruines"></textarea>
+      <div class="actions">
+        <button class="primary" id="retouchBtn">Copier la demande pour l’IA</button>
+        <button class="ghost" id="retouchNext" hidden>J’ai la nouvelle réponse →</button>
+      </div>
+      <p class="note" id="retouchNote" role="status" aria-live="polite"></p>
+      <div class="codebox" id="retouchFallback" hidden></div>
+    </section>
+    <div class="actions" style="margin-top:24px">
+      <button class="link" id="editReply">Modifier la réponse à la main</button>
       <button class="ghost" id="restart">Nouvelle carte</button>
     </div>
   </section>
@@ -392,8 +414,7 @@ const BIOMES = {temperate_forest: 'Forêt tempérée', subtropical_forest: 'For�
   swamp: 'Marécage', desert: 'Désert', tundra: 'Toundra', lava: 'Volcanique', beach: 'Plage'};
 // What each preview colour stands for (keys come from the server's legend).
 const LEGEND_NAMES = {water: 'Eau', ground: 'Sol naturel', base_ground: 'Chemin, sol nu', mountain: 'Roche, relief',
-  ruins: 'Ruines', other: 'Autre terrain', building: 'Emprise de bâtiment', poi: 'Point d’intérêt',
-  anchor: 'Centre de zone (numéroté)'};
+  ruins: 'Ruines', other: 'Autre terrain', building: 'Emprise de bâtiment', poi: 'Point d’intérêt'};
 // French names for the points of interest the generator understands.
 const POI_NAMES = {broken_pillar: 'colonne brisée', pillar: 'pilier', column: 'colonne', altar: 'autel',
   campfire: 'feu de camp', bonfire: 'grand feu', skull: 'crâne', skulls: 'tas de crânes', skeleton: 'squelette',
@@ -413,6 +434,7 @@ const REPLY_ERRORS = {
 const STORE_KEY = 'cartographe.etat.v1';
 const state = {step: 1, desc: '', w: 50, l: 50, biome: '', prompt: '', copied: false, reply: ''};
 let result = null; // last generation, kept in memory only (it holds a blob URL)
+let config = {};    // capabilities reported by /api/config
 function save(){ try { sessionStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} }
 function restore(){
   try {
@@ -591,10 +613,9 @@ function zoneName(z){
   return z.id.replace(/_/g, ' ');
 }
 function poiName(prop){ return POI_NAMES[prop] || prop.replace(/_/g, ' '); }
+const SLAB_LIMIT = 30000; // TaleSpire's per-paste limit, in bytes of code
 function frenchWarning(w){
-  let m = w.match(/^slab is (\d+) bytes/);
-  if (m) return `Cette carte pèse ${Math.round(m[1] / 1000)} ko, au-delà des 30 ko environ que TaleSpire accepte : elle risque de ne pas s’enregistrer. Réduisez sa taille dans les options avancées.`;
-  m = w.match(/^zone "(.+)": unknown POI prop "(.+)" \(skipped\)$/);
+  let m = w.match(/^zone "(.+)": unknown POI prop "(.+)" \(skipped\)$/);
   if (m) return `« ${poiName(m[2])} » n’existe pas dans TaleSpire : cet élément de la zone « ${m[1]} » est ignoré.`;
   m = w.match(/^zone "(.+)": POI "(.+)" overlaps a reserved building footprint/);
   if (m) return `« ${poiName(m[2])} » chevauche un bâtiment dans la zone « ${m[1]} » : il est ignoré.`;
@@ -627,39 +648,55 @@ function renderMap(data){
     const ln = document.createElementNS(svgNS, 'line');
     for (const [k, v] of Object.entries({x1, y1, x2, y2, stroke: 'rgba(27,21,17,.5)', 'stroke-width': 1, 'stroke-dasharray': '3 3', 'vector-effect': 'non-scaling-stroke'})) ln.setAttribute(k, v);
     svg.appendChild(ln);
+    return ln;
   };
   for (let x = step; x < w; x += step) line(x, 0, x, l);
   for (let y = step; y < l; y += step) line(0, y, w, y);
   cell.appendChild(svg);
-  const placed = [];
+  // Each zone is numbered on a tile it owns (the server picks the deepest one,
+  // so a courtyard's number is not drawn in the pond at its centre).
   zones.forEach((z, i) => {
-    const a = z.anchor || {x: 0, y: 0};
-    // Nested zones share their parent's centre: nudge the badge aside.
-    const twins = placed.filter((p) => Math.abs(p.x - a.x) < 3 && Math.abs(p.y - a.y) < 3).length;
-    placed.push(a);
+    const [x, y] = (data.labels && data.labels[i]) || [(z.anchor || {}).x || 0, (z.anchor || {}).y || 0];
     const badge = el('span', {className: 'zone-badge'}, String(i + 1));
-    badge.style.left = `calc(${((a.x + .5) / w) * 100}% + ${twins * 28}px)`;
-    badge.style.top = `${((a.y + .5) / l) * 100}%`;
+    badge.style.left = `${((x + .5) / w) * 100}%`;
+    badge.style.top = `${((y + .5) / l) * 100}%`;
     badge.setAttribute('aria-hidden', 'true');
     cell.appendChild(badge);
   });
+  // Slice boundaries, numbered in the order of the copy buttons.
+  const slices = data.slices || [], size = data.slice_size || 0;
+  if (slices.length && size){
+    const cols = slices.length, rows = slices[0].length;
+    for (let x = size; x < w; x += size){ const ln = line(x, 0, x, l); ln.setAttribute('stroke', 'rgba(240,232,221,.9)'); ln.setAttribute('stroke-width', 2); ln.removeAttribute('stroke-dasharray'); }
+    for (let y = size; y < l; y += size){ const ln = line(0, y, w, y); ln.setAttribute('stroke', 'rgba(240,232,221,.9)'); ln.setAttribute('stroke-width', 2); ln.removeAttribute('stroke-dasharray'); }
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
+      const tag = el('span', {className: 'piece-label'}, `Morceau ${y * cols + x + 1}`);
+      tag.style.left = `${(x * size / w) * 100}%`; tag.style.top = `${(y * size / l) * 100}%`;
+      tag.setAttribute('aria-hidden', 'true');
+      cell.appendChild(tag);
+    }
+  }
   const rx = $('rulerX'), ry = $('rulerY'); rx.replaceChildren(); ry.replaceChildren();
   // Zero is implied by the corner, which holds the north arrow.
   for (let x = step; x <= w; x += step){ const s = el('span', {}, String(x)); s.style.left = (x / w) * 100 + '%'; rx.appendChild(s); }
   for (let y = step; y <= l; y += step){ const s = el('span', {}, String(y)); s.style.top = (y / l) * 100 + '%'; ry.appendChild(s); }
 
   // Legend, straight from the colours the server actually drew.
-  $('legend').replaceChildren(...(data.legend || []).map((entry) => {
+  const legend = (data.legend || []).map((entry) => {
     const li = el('li');
-    // Zone centres are shown as the numbered badges, so show a badge here too.
-    const sw = entry.key === 'anchor'
-      ? el('span', {className: 'zone-badge legend-badge'}, '1')
-      : el('span', {className: 'swatch'});
-    if (entry.key !== 'anchor') sw.style.background = entry.color;
+    const sw = el('span', {className: 'swatch' + (entry.pattern ? ' ' + entry.pattern : '')});
+    sw.style.backgroundColor = entry.color;
     sw.setAttribute('aria-hidden', 'true');
     li.append(sw, LEGEND_NAMES[entry.key] || entry.key);
     return li;
-  }));
+  });
+  if (zones.length){
+    const li = el('li'), badge = el('span', {className: 'zone-badge legend-badge'}, '1');
+    badge.setAttribute('aria-hidden', 'true');
+    li.append(badge, 'Numéro de zone (voir la liste)');
+    legend.push(li);
+  }
+  $('legend').replaceChildren(...legend);
   $('buildingNote').hidden = !(doc.buildings && doc.buildings.length);
 
   // Zones, numbered like the markers on the map.
@@ -674,13 +711,18 @@ function renderMap(data){
 
   // Export.
   $('codeBox').textContent = data.code || '';
-  const slices = data.slices || [];
+  const tooBig = (data.code || '').length > SLAB_LIMIT;
   $('slicesWrap').hidden = !slices.length;
+  // Sliced because it is too big: only the pieces will save in TaleSpire.
+  $('copyCode').hidden = slices.length > 0 && tooBig;
   $('copyCode').className = slices.length ? 'ghost large' : 'primary large';
   $('copyCode').textContent = slices.length ? 'Copier la carte entière' : 'Copier le code TaleSpire';
   if (slices.length){
     const cols = slices.length, rows = slices[0].length;
-    $('slicesLabel').textContent = `TaleSpire refuse les collages de plus de 30 ko environ : la carte est découpée en ${cols * rows} morceaux. Collez-les un par un, côte à côte, comme sur cette grille.`;
+    $('slicesLabel').textContent = (tooBig
+      ? `La carte dépasse les 30 ko environ que TaleSpire accepte en un collage : elle est découpée en ${cols * rows} morceaux`
+      : `La carte est découpée en ${cols * rows} morceaux`)
+      + ` de ${size} × ${size} cases au plus, numérotés sur l’aperçu. Copiez-les et collez-les un par un, chacun juste à côté du précédent, en suivant la grille.`;
     const grid = $('slices'); grid.replaceChildren();
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
@@ -690,15 +732,13 @@ function renderMap(data){
       grid.appendChild(b);
     }
   }
-  // A map over TaleSpire's slab limit pastes but fails on save: say so
-  // where the copy button is, not in a footnote.
-  const heavy = (data.warnings || []).map((w) => w.match(/^slab is (\d+) bytes/)).find(Boolean);
-  $('oversize').hidden = !heavy;
-  if (heavy){
-    $('oversize').textContent = `Carte trop lourde pour TaleSpire : ${Math.round(heavy[1] / 1000)} ko pour une limite d’environ 30 ko. Elle se collera, mais le plateau risque de ne pas s’enregistrer. Réduisez sa taille dans les options avancées (60 × 60 cases par exemple), puis redemandez la carte.`;
-    if (!slices.length){ $('copyCode').className = 'ghost large'; $('copyCode').textContent = 'Copier quand même'; }
-  }
-  const warnings = (data.warnings || []).filter((w) => !/^slab is /.test(w)).map(frenchWarning);
+  // A slab over TaleSpire's limit pastes but fails on save: say so where the
+  // copy buttons are, not in a footnote. Automatic slicing makes this rare
+  // (a piece too dense even when small, a big building say).
+  const heavy = (data.warnings || []).filter((w) => /^(slab|slice \[\d+,\d+\]) is \d+ bytes/.test(w));
+  $('oversize').hidden = !heavy.length && !(tooBig && !slices.length);
+  $('oversize').textContent = 'Un morceau reste trop lourd pour TaleSpire (plus de 30 ko environ) : il se collera, mais le plateau risque de ne pas s’enregistrer. Allégez la zone concernée ou réduisez la taille de la carte, puis redemandez-la.';
+  const warnings = (data.warnings || []).filter((w) => !heavy.includes(w)).map(frenchWarning);
   $('mapWarnings').replaceChildren(...warnings.map((t) => el('li', {}, t)));
   $('warningsWrap').hidden = !warnings.length;
 }
@@ -711,11 +751,91 @@ $('editReply').onclick = () => setStep(3);
 $('restart').onclick = () => {
   Object.assign(state, {desc: '', prompt: '', copied: false, reply: ''});
   result = null; $('desc').value = ''; $('jsonIn').value = '';
+  resetRetouch();
   setStep(1);
 };
 
+// Retouch: the map is edited from a plain-language request, relative to the
+// current map. With an AI key (desktop) Claude applies it directly; otherwise
+// the request, carrying the current map, goes to the visitor's own AI.
+function retouchRequest(change){
+  return 'Voici la carte actuelle du Cartographe :\n\n```json\n' + JSON.stringify(result.ir) + '\n```\n\n'
+    + `Modifiez-la seulement ainsi : « ${change} ». Gardez tout le reste identique, respectez les mêmes règles que pour la carte d’origine, et renvoyez le JSON complet de la carte, sans autre texte.`;
+}
+function resetRetouch(){
+  $('retouchText').value = ''; $('retouchNote').textContent = '';
+  $('retouchNext').hidden = true; $('retouchFallback').hidden = true;
+}
+function updateRetouchMode(){
+  const direct = !!config.nl_enabled;
+  $('retouchBtn').textContent = direct ? 'Appliquer la retouche' : 'Copier la demande pour l’IA';
+  $('retouchLead').textContent = direct
+    ? 'Décrivez le changement comme à votre table : Claude retouche la carte et le Cartographe la redessine.'
+    : 'Décrivez le changement comme à votre table : le Cartographe prépare la demande pour votre IA, qui renverra la carte modifiée.';
+}
+$('retouchBtn').onclick = async () => {
+  const change = $('retouchText').value.trim();
+  if (!change){ $('retouchNote').textContent = 'Décrivez d’abord le changement souhaité.'; $('retouchText').focus(); return; }
+  if (!result) return;
+  if (config.nl_enabled && result.session){
+    await busy($('retouchBtn'), 'Retouche en cours…', async () => {
+      try {
+        const data = await postJSON('/api/adjust', {session: result.session, message: change});
+        result = data; state.reply = JSON.stringify(data.ir); save();
+        renderMap(data); resetRetouch();
+        $('retouchNote').textContent = 'Carte retouchée.';
+      } catch (e) { $('retouchNote').textContent = 'La retouche n’a pas abouti (' + e.message + '). Reformulez la demande puis réessayez.'; }
+    });
+    return;
+  }
+  const request = retouchRequest(change);
+  $('retouchFallback').hidden = true;
+  if (await copyText(request)){
+    $('retouchNote').textContent = 'Demande copiée. Collez-la dans votre conversation avec l’IA, puis revenez avec sa nouvelle réponse.';
+  } else {
+    $('retouchFallback').textContent = request; $('retouchFallback').hidden = false; selectContents($('retouchFallback'));
+    $('retouchNote').textContent = 'Copie automatique impossible : la demande est sélectionnée ci-dessous, faites Ctrl + C (Cmd + C sur Mac).';
+  }
+  $('retouchNext').hidden = false;
+};
+$('retouchNext').onclick = () => {
+  $('jsonIn').value = ''; state.reply = ''; save();
+  resetRetouch();
+  setStep(3);
+};
+
+// Website only: the engine (WebAssembly) downloads on the first visit, which
+// can take a while on a slow connection; cartographe.js reports its progress.
+let engineTimer = null;
+const mb = (n) => (n / 1e6).toLocaleString('fr-FR', {maximumFractionDigits: 1});
+function engineProgress({loaded, total}){
+  // Only show up when the download is slow enough to be noticed.
+  if (!engineTimer && $('engineStatus').hidden) engineTimer = setTimeout(() => { $('engineStatus').hidden = false; }, 600);
+  $('engineBar').max = total || 1;
+  $('engineBar').value = total ? Math.min(loaded, total) : 0;
+  $('engineText').textContent = total
+    ? `Chargement du moteur de génération : ${mb(loaded)} sur ${mb(total)} Mo`
+    : `Chargement du moteur de génération : ${mb(loaded)} Mo`;
+}
+function engineReady(){ clearTimeout(engineTimer); engineTimer = -1; $('engineStatus').hidden = true; }
+function engineFailed(){
+  clearTimeout(engineTimer); engineTimer = -1;
+  $('engineBar').hidden = true; $('engineStatus').hidden = false;
+  $('engineText').textContent = 'Le moteur de génération n’a pas pu se charger. Vérifiez votre connexion, puis rechargez la page.';
+}
+window.addEventListener('cartographe:progress', (e) => { if (engineTimer !== -1) engineProgress(e.detail); });
+window.addEventListener('cartographe:ready', engineReady);
+window.addEventListener('cartographe:failed', engineFailed);
+// Events sent before this script ran are summarised on window.
+if (window.cartographeEngine){
+  const e = window.cartographeEngine;
+  if (e.state === 'ready') engineReady(); else if (e.state === 'failed') engineFailed(); else engineProgress(e);
+}
+
 // Desktop-only capabilities.
 fetch('/api/config').then((r) => r.json()).then(async (cfg) => {
+  config = cfg;
+  updateRetouchMode();
   if (cfg.quit_enabled){
     const q = $('quit'); q.hidden = false;
     q.onclick = async () => {

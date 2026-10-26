@@ -24,7 +24,12 @@ done
 [[ -f "$OUT/wasm_exec.js" ]] || { echo "error: wasm_exec.js not found under $GOROOT" >&2; exit 1; }
 
 echo "==> assembling the site"
-cp web/cartographe.js web/_headers "$OUT/"
+cp web/_headers "$OUT/"
+# The bridge reports download progress against the engine's real size.
+WASM_BYTES="$(wc -c < "$OUT/app.wasm" | tr -d ' ')"
+sed "s/const WASM_BYTES = 0;/const WASM_BYTES = $WASM_BYTES;/" web/cartographe.js > "$OUT/cartographe.js"
+grep -q "const WASM_BYTES = $WASM_BYTES;" "$OUT/cartographe.js" \
+  || { echo "error: could not set WASM_BYTES in cartographe.js" >&2; exit 1; }
 # Everything the desktop app serves under /static/ (logos, fonts, legal page);
 # index.html is assembled separately below.
 cp -R internal/server/static/. "$OUT/static/"

@@ -132,7 +132,7 @@ func main() {
 		log.Printf("warning: %s", w)
 	}
 	if *previewPath != "" {
-		if err := preview.SavePNG(*previewPath, res.IR, mask, gres.Height, preview.Options{Scale: *scale}); err != nil {
+		if err := preview.SavePNG(*previewPath, res.IR, mask, gres.Height, preview.Options{Scale: *scale, MarkAnchors: true}); err != nil {
 			log.Fatalf("writing preview: %v", err)
 		}
 		log.Printf("preview written to %s", *previewPath)

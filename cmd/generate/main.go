@@ -35,7 +35,7 @@ func main() {
 	scale := flag.Int("scale", 8, "preview pixels per tile")
 	seed := flag.Int64("seed", 1, "random seed for reproducible generation")
 	transition := flag.Int("transition", 3, "zone-border stitching half-width in tiles (0 = hard borders)")
-	slice := flag.Int("slice", 0, "slice the map into slabs of at most N tiles per side (0 = single slab)")
+	slice := flag.Int("slice", 0, "slice the map into slabs of at most N tiles per side (0 = automatic, only when the map is over TaleSpire's ~30 kB slab limit)")
 	prefabsPath := flag.String("prefabs", "", "optional external prefab catalogue instead of the embedded catalogue")
 	flag.Parse()
 	builtin := talespire.PrefabCatalog()
@@ -83,7 +83,7 @@ func main() {
 		if err := os.MkdirAll(filepath.Dir(*previewPath), 0o755); err != nil {
 			log.Fatalf("creating preview dir: %v", err)
 		}
-		if err := preview.SavePNG(*previewPath, doc, mask, res.Height, preview.Options{Scale: *scale}); err != nil {
+		if err := preview.SavePNG(*previewPath, doc, mask, res.Height, preview.Options{Scale: *scale, MarkAnchors: true}); err != nil {
 			log.Fatalf("writing preview: %v", err)
 		}
 		log.Printf("preview written to %s", *previewPath)

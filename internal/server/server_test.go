@@ -137,9 +137,13 @@ func TestGenerateFromPastedReply(t *testing.T) {
 	if len(legend) == 0 {
 		t.Fatalf("no legend in response: %v", out)
 	}
-	last, _ := legend[len(legend)-1].(map[string]any)
-	if last["key"] != "anchor" || !strings.HasPrefix(last["color"].(string), "#") {
-		t.Errorf("legend should end with the zone anchor swatch, got %v", legend)
+	first, _ := legend[0].(map[string]any)
+	if first["key"] != "ground" || !strings.HasPrefix(first["color"].(string), "#") {
+		t.Errorf("legend should list the ground drawn by the canned map, got %v", legend)
+	}
+	// One label point per zone, for the UI to number the zones on the map.
+	if labels, _ := out["labels"].([]any); len(labels) != 1 {
+		t.Errorf("expected one label point for the single zone, got %v", out["labels"])
 	}
 }
 

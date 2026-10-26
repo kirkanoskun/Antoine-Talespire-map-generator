@@ -177,6 +177,73 @@ func (m *Mask) TileCounts() []int {
 	return counts
 }
 
+// LabelPoints returns, per zone index, the tile where a label for that zone
+// reads best: the one nearest the zone's anchor among its tiles well inside it
+// (at least labelDepth tiles from any other zone and from the map edge, or as
+// deep as the zone gets when it is thinner). Anchors alone mislead for nested
+// zones: a courtyard's anchor sits in the pond stamped at its centre. A zone
+// that owns no tile falls back to its anchor.
+func (m *Mask) LabelPoints() [][2]int {
+	w, l := m.Width, m.Length
+	dist := make([][]int, w)
+	var queue [][2]int
+	for x := 0; x < w; x++ {
+		dist[x] = make([]int, l)
+		for y := 0; y < l; y++ {
+			if x == 0 || y == 0 || x == w-1 || y == l-1 || m.IsBoundary(x, y) {
+				dist[x][y] = 1
+				queue = append(queue, [2]int{x, y})
+			}
+		}
+	}
+	// Multi-source BFS: every tile learns its distance to the nearest edge
+	// tile, moving only within its own zone.
+	for i := 0; i < len(queue); i++ {
+		x, y := queue[i][0], queue[i][1]
+		for _, d := range [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			nx, ny := x+d[0], y+d[1]
+			if nx < 0 || ny < 0 || nx >= w || ny >= l || dist[nx][ny] != 0 || m.Cells[nx][ny] != m.Cells[x][y] {
+				continue
+			}
+			dist[nx][ny] = dist[x][y] + 1
+			queue = append(queue, [2]int{nx, ny})
+		}
+	}
+
+	// Required depth per zone: labelDepth, or the zone's deepest tile.
+	need := make([]int, len(m.zones))
+	for x := 0; x < w; x++ {
+		for y := 0; y < l; y++ {
+			if zi := m.Cells[x][y]; dist[x][y] > need[zi] {
+				need[zi] = min(dist[x][y], labelDepth)
+			}
+		}
+	}
+	points := make([][2]int, len(m.zones))
+	nearest := make([]int, len(m.zones))
+	for i, z := range m.zones {
+		points[i] = [2]int{clampInt(z.Anchor.X, 0, w-1), clampInt(z.Anchor.Y, 0, l-1)}
+		nearest[i] = -1
+	}
+	for x := 0; x < w; x++ {
+		for y := 0; y < l; y++ {
+			zi := m.Cells[x][y]
+			if dist[x][y] < need[zi] {
+				continue
+			}
+			a := m.zones[zi].Anchor
+			if d2 := (x-a.X)*(x-a.X) + (y-a.Y)*(y-a.Y); nearest[zi] < 0 || d2 < nearest[zi] {
+				nearest[zi], points[zi] = d2, [2]int{x, y}
+			}
+		}
+	}
+	return points
+}
+
+// labelDepth is how far inside its zone (in tiles) a label should sit when the
+// zone is thick enough: clear of the border, without drifting to a far corner.
+const labelDepth = 4
+
 // IsBoundary reports whether tile (x,y) sits on a border between two different
 // zones (any 4-neighbour belongs to a different zone). Zone transitions
 // (brief 5.5) will operate on these tiles; the preview also highlights them.
