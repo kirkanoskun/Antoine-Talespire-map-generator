@@ -50,6 +50,7 @@
   .step.active .dot{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
   .step.done .dot{background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
   .steps-compact{display:none; margin:0; font-size:13px; color:var(--muted)}
+  .steps-compact button.link{margin-left:8px; font-size:13px}
   .quit{background:transparent; border:1px solid var(--control); color:var(--muted); border-radius:8px;
     padding:7px 12px; cursor:pointer; font:inherit; font-size:13px}
   .quit:hover{color:var(--ink); border-color:var(--accent)}
@@ -175,6 +176,8 @@
   .piece{display:grid; grid-template-columns:24px 1fr auto; gap:2px 10px; align-items:center;
     padding:8px 10px; border:1px solid var(--border); border-radius:10px; transition:border-color .15s var(--ease)}
   .piece.next{border-color:var(--accent)}
+  .piece.copied{border-color:var(--accent); background:var(--accent-soft)}
+  .piece .copied-note{grid-column:2 / 4; font-size:13px; color:var(--ink)}
   .piece .zone-badge{position:static; margin:0}
   .piece.done .zone-badge{background:var(--accent-soft); color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
   .piece b{font-weight:600; font-size:14px}
@@ -235,7 +238,7 @@
         <li><button class="step" data-step="3"><span class="dot">3</span><span>Coller la réponse</span></button></li>
         <li><button class="step" data-step="4"><span class="dot">4</span><span>Carte prête</span></button></li>
       </ol>
-      <p class="steps-compact" id="stepsCompact"></p>
+      <p class="steps-compact"><span id="stepsCompact"></span><button class="link" id="stepsMap" hidden>Voir la carte</button></p>
     </nav>
     <button class="quit" id="quit" hidden>Quitter</button>
   </div>
@@ -349,7 +352,7 @@
   <!-- Step 3: paste the AI's reply -->
   <section id="s3" aria-labelledby="t3" hidden>
     <h2 class="title" id="t3" tabindex="-1">Collez la réponse de l’IA</h2>
-    <p class="lead">Copiez toute sa réponse, même avec du texte autour : le Cartographe y retrouve la carte, la vérifie et la dessine.</p>
+    <p class="lead" id="lead3">Copiez toute sa réponse, même avec du texte autour : le Cartographe y retrouve la carte, la vérifie et la dessine.</p>
     <label for="jsonIn">Réponse de l’IA</label>
     <textarea id="jsonIn" aria-describedby="jsonErr" aria-keyshortcuts="Control+Enter Meta+Enter"
       placeholder="Collez ici la réponse complète de votre assistant…"></textarea>
@@ -509,7 +512,13 @@ function setStep(n, {push = true, focus = true} = {}){
   $('stepsCompact').textContent = `Étape ${n} sur 4 · ${STEP_NAMES[n]}`;
   for (let i = 1; i <= 4; i++) $('s' + i).hidden = i !== n;
   $('howto').hidden = n !== 1;
-  $('backFrom3').textContent = state.prompt ? '← Revenir au prompt' : '← Modifier la description';
+  // With a map on screen (a retouch, say), step 3 leads back to it, not to the
+  // prompt: on a phone the step bar is plain text, so this is the way back.
+  $('backFrom3').textContent = result ? '← Revenir à la carte' : state.prompt ? '← Revenir au prompt' : '← Modifier la description';
+  $('lead3').textContent = result
+    ? 'Collez la nouvelle réponse de l’IA, même avec du texte autour. La carte actuelle reste disponible tant que vous n’en affichez pas une autre.'
+    : 'Copiez toute sa réponse, même avec du texte autour : le Cartographe y retrouve la carte, la vérifie et la dessine.';
+  $('stepsMap').hidden = !result || n === 4;
   if (push) history.pushState({step: n}, '');
   if (focus){
     window.scrollTo({top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
@@ -530,10 +539,14 @@ async function postJSON(url, body){
 async function copyText(text){
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }
+// Briefly confirms an action on its button. A second click restarts the
+// timer instead of stacking one, and "back" is always the button's own label.
 function flash(btn, label, back){
+  clearTimeout(btn.flashTimer);
   btn.textContent = label;
-  setTimeout(() => { btn.textContent = back; }, 1600);
+  btn.flashTimer = setTimeout(() => { btn.textContent = back; }, 1600);
 }
+function resetFlash(btn, label){ clearTimeout(btn.flashTimer); btn.textContent = label; }
 function selectContents(el){
   const range = document.createRange(); range.selectNodeContents(el);
   const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
@@ -673,7 +686,8 @@ async function drawMap(){
 }
 $('drawMap').onclick = drawMap;
 onCtrlEnter($('jsonIn'), drawMap);
-$('backFrom3').onclick = () => setStep(state.prompt ? 2 : 1);
+$('backFrom3').onclick = () => setStep(result ? 4 : state.prompt ? 2 : 1);
+$('stepsMap').onclick = () => setStep(4);
 
 // Step 4: the map first, framed like a survey sheet, with a legend.
 function zoneName(z){
@@ -710,7 +724,9 @@ function renderMap(data){
   cell.style.aspectRatio = `${w} / ${l}`;
   $('revertWrap').hidden = !state.previousReply;
   // The alt text summarises what the image shows, for those who can't see it.
-  const counted = (data.legend || []).filter((e) => e.count).map((e) => `${e.count} ${(LEGEND_NAMES[e.key] || e.key).toLowerCase()}`);
+  const plural = {poi: 'points d’intérêt'};
+  const counted = (data.legend || []).filter((e) => e.count).map((e) =>
+    `${e.count} ${(e.count > 1 && plural[e.key]) || (LEGEND_NAMES[e.key] || e.key).toLowerCase()}`);
   const terrain = (data.legend || []).filter((e) => !e.count && e.key !== 'boundary').map((e) => (LEGEND_NAMES[e.key] || e.key).toLowerCase());
   const img = el('img', {src: data.preview_url, alt: `Aperçu vu du dessus de la carte « ${map.name || 'sans nom'} » : ${zones.length} zones, terrain ${terrain.join(', ')}${counted.length ? ' ; ' + counted.join(', ') : ''}.`});
   cell.appendChild(img);
@@ -797,6 +813,7 @@ function renderMap(data){
 
   // Export.
   $('codeBox').textContent = data.code || '';
+  resetFlash($('copyCode'), COPY_CODE);
   const tooBig = (data.code || '').length > SLAB_LIMIT;
   $('slicesWrap').hidden = !slices.length;
   $('singleExport').hidden = slices.length > 0;
@@ -827,7 +844,7 @@ function renderPieces(slices, size, w, l, tooBig, code){
   if (!slices.length) return;
   const cols = slices.length, rows = slices[0].length, n = cols * rows;
   const key = codeKey(code) + ':' + size;
-  if (!state.pieces || state.pieces.key !== key){ state.pieces = {key, done: []}; save(); }
+  if (!state.pieces || state.pieces.key !== key){ state.pieces = {key, done: [], copied: -1}; save(); }
   pieces = {cols, rows, n, slices};
   $('piecesTitle').textContent = `Carte en ${n} morceaux`;
   $('slicesLabel').textContent = (tooBig
@@ -851,12 +868,14 @@ function renderPieces(slices, size, w, l, tooBig, code){
     const label = el('label'); label.htmlFor = tick.id; label.append(tick, 'Collé dans TaleSpire');
     copy.onclick = async () => {
       if (!(await copyText(slices[x][y]))) return;
-      flash(copy, 'Copié ✓', 'Copier');
-      markPiece(i, true);
-      announce(`Morceau ${i + 1} copié. Collez-le dans TaleSpire.`);
+      // Copying is not pasting: only the visitor's own tick says it is done.
+      state.pieces.copied = i; save();
+      updatePieces();
+      announce(`Morceau ${i + 1} copié. Collez-le dans TaleSpire, puis cochez «\u00a0Collé\u00a0».`);
     };
     tick.onchange = () => markPiece(i, tick.checked);
-    li.append(el('span', {className: 'zone-badge'}, String(i + 1)), info, copy, label);
+    const note = el('span', {className: 'copied-note'}, 'Copié : collez-le dans TaleSpire, puis cochez «\u00a0Collé\u00a0».');
+    li.append(el('span', {className: 'zone-badge'}, String(i + 1)), info, copy, note, label);
     list.appendChild(li);
   }
   updatePieces();
@@ -864,6 +883,7 @@ function renderPieces(slices, size, w, l, tooBig, code){
 function markPiece(i, done){
   const set = new Set(state.pieces.done);
   if (done) set.add(i); else set.delete(i);
+  if (done && state.pieces.copied === i) state.pieces.copied = -1;
   state.pieces.done = [...set].sort((a, b) => a - b); save();
   updatePieces();
 }
@@ -872,12 +892,17 @@ function updatePieces(){
   const done = new Set(state.pieces.done);
   let next = -1;
   for (let i = 0; i < pieces.n; i++) if (!done.has(i)){ next = i; break; }
+  const copied = state.pieces.copied ?? -1;
   for (const li of $('slices').children){
     const i = +li.dataset.piece;
     li.classList.toggle('done', done.has(i));
-    li.classList.toggle('next', i === next);
+    li.classList.toggle('next', i === next && i !== copied);
+    li.classList.toggle('copied', i === copied);
+    li.querySelector('.copied-note').hidden = i !== copied;
     li.querySelector('input').checked = done.has(i);
-    li.querySelector('button').className = i === next ? 'primary' : 'ghost';
+    const button = li.querySelector('button');
+    button.className = i === next && i !== copied ? 'primary' : 'ghost';
+    button.textContent = i === copied ? 'Recopier' : 'Copier';
   }
   for (const tag of $('mapCell').querySelectorAll('.piece-label')){
     const i = +tag.dataset.piece;
@@ -885,9 +910,11 @@ function updatePieces(){
     tag.classList.toggle('next', i === next);
     tag.textContent = (done.has(i) ? '✓ ' : '') + `Morceau ${i + 1}`;
   }
+  const count = done.size === 0 ? 'Aucun morceau collé'
+    : `${done.size} morceau${done.size > 1 ? 'x' : ''} collé${done.size > 1 ? 's' : ''}`;
   $('piecesProgress').textContent = next < 0
     ? `Les ${pieces.n} morceaux sont collés : la carte est complète. Bonne partie !`
-    : `${done.size} morceau${done.size > 1 ? 'x' : ''} collé${done.size > 1 ? 's' : ''} sur ${pieces.n}. Suivant : le morceau ${next + 1}.`;
+    : `${count} sur ${pieces.n}. ${copied === next ? 'Collez le morceau ' + (next + 1) + ', puis cochez-le.' : 'Suivant : le morceau ' + (next + 1) + '.'}`;
 }
 $('copyWhole').onclick = async () => {
   if (await copyText((result && result.code) || '')){
@@ -895,9 +922,9 @@ $('copyWhole').onclick = async () => {
     announce('Carte entière copiée.');
   }
 };
+const COPY_CODE = 'Copier le code TaleSpire';
 $('copyCode').onclick = async () => {
-  const idle = $('copyCode').textContent;
-  if (await copyText((result && result.code) || '')){ flash($('copyCode'), 'Code copié ✓', idle); announce('Code TaleSpire copié.'); }
+  if (await copyText((result && result.code) || '')){ flash($('copyCode'), 'Code copié ✓', COPY_CODE); announce('Code TaleSpire copié.'); }
   else { $('codeBox').parentElement.open = true; selectContents($('codeBox')); }
 };
 $('editReply').onclick = () => setStep(3);
