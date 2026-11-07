@@ -172,18 +172,20 @@
   .export h3{font-size:15px}
   .placing{margin:10px 0 0; padding-left:20px; font-size:14px; color:var(--muted)}
   .placing li{margin-bottom:4px}
-  .pieces{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:8px}
-  .piece{display:grid; grid-template-columns:24px 1fr auto; gap:2px 10px; align-items:center;
-    padding:8px 10px; border:1px solid var(--border); border-radius:10px; transition:border-color .15s var(--ease)}
+  /* Pieces of a sliced map: tiles laid out like the cut, in the map's own
+     column under it (past the ruler), tagged like the map's labels. */
+  .pieces{grid-column:2; list-style:none; margin:16px 0 0; padding:0; display:grid; gap:6px}
+  .piece{display:flex; flex-direction:column; gap:6px; min-width:0; padding:8px; background:var(--panel);
+    border:1px solid var(--border); border-radius:8px; transition:border-color .15s var(--ease)}
   .piece.next{border-color:var(--accent)}
   .piece.copied{border-color:var(--accent); background:var(--accent-soft)}
-  .piece .copied-note{grid-column:2 / 4; font-size:13px; color:var(--ink)}
-  .piece .zone-badge{position:static; margin:0}
-  .piece.done .zone-badge{background:var(--accent-soft); color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
-  .piece b{font-weight:600; font-size:14px}
-  .piece small{display:block; color:var(--muted); font-size:12.5px}
-  .piece button{padding:8px 12px; font-size:13px}
-  .piece label{grid-column:2 / 4; display:flex; align-items:center; gap:6px; margin:0; font-size:13px; font-weight:400; color:var(--muted)}
+  .piece-tag{align-self:flex-start; padding:0 6px; border-radius:4px; background:var(--bg); color:var(--ink);
+    font-size:12px; font-weight:600; line-height:20px}
+  .piece.next .piece-tag, .piece.copied .piece-tag{background:var(--accent); color:var(--accent-ink)}
+  .piece.done .piece-tag{color:var(--muted)}
+  .piece small{color:var(--muted); font-size:12px}
+  .piece button{width:100%; padding:7px 8px; font-size:13px}
+  .piece label{display:flex; align-items:center; gap:6px; margin:0; font-size:13px; font-weight:400; color:var(--muted)}
   .piece input{width:auto; accent-color:var(--accent)}
   .pieces-progress{margin:12px 0 0; font-size:14px; color:var(--ink)}
   .piece-label.next{background:var(--accent); color:var(--accent-ink)}
@@ -386,6 +388,7 @@
         <div class="ruler ruler-y" id="rulerY" aria-hidden="true"></div>
         <div class="map-cell" id="mapCell"></div>
         <figcaption id="mapCaption">Vue du dessus, nord en haut. Les teintes claires sont les points hauts.</figcaption>
+        <ol class="pieces" id="slices" aria-label="Morceaux à coller, disposés comme sur la carte" hidden></ol>
       </figure>
       <div class="side">
         <div class="panel export">
@@ -398,7 +401,6 @@
             <h3 id="piecesTitle"></h3>
             <p class="note" id="slicesLabel" style="margin:0"></p>
             <ol class="placing" id="placing"></ol>
-            <ol class="pieces" id="slices"></ol>
             <p class="pieces-progress" id="piecesProgress" role="status" aria-live="polite"></p>
             <button class="link" id="copyWhole" hidden>Copier plutôt la carte entière</button>
           </div>
@@ -816,6 +818,7 @@ function renderMap(data){
   resetFlash($('copyCode'), COPY_CODE);
   const tooBig = (data.code || '').length > SLAB_LIMIT;
   $('slicesWrap').hidden = !slices.length;
+  $('slices').hidden = !slices.length;
   $('singleExport').hidden = slices.length > 0;
   // Sliced because it is too big: only the pieces will save in TaleSpire.
   $('copyWhole').hidden = !slices.length || tooBig;
@@ -857,15 +860,20 @@ function renderPieces(slices, size, w, l, tooBig, code){
   $('placing').replaceChildren(...steps.map((t) => el('li', {}, t)));
 
   const list = $('slices'); list.replaceChildren();
+  // The tiles mirror the cut: same columns as the map, up to a width where
+  // they would get too narrow to read (then they simply wrap).
+  list.style.gridTemplateColumns = cols <= 5 ? `repeat(${cols}, minmax(0, 1fr))` : 'repeat(auto-fill, minmax(110px, 1fr))';
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){
     const i = y * cols + x;
     const pw = Math.min(size, w - x * size), pl = Math.min(size, l - y * size);
     const li = el('li', {className: 'piece'}); li.dataset.piece = String(i);
-    const info = el('span'); info.append(el('b', {}, `Morceau ${i + 1}`), el('small', {}, `ligne ${y + 1}, colonne ${x + 1} · ${pw} × ${pl} cases`));
+    const tag = el('span', {className: 'piece-tag'}, `Morceau ${i + 1}`);
+    const sizeNote = el('small', {}, `${pw} × ${pl} cases`);
     const copy = el('button', {className: 'ghost'}, 'Copier');
-    copy.setAttribute('aria-label', `Copier le morceau ${i + 1}`);
+    copy.setAttribute('aria-label', `Copier le morceau ${i + 1} (ligne ${y + 1}, colonne ${x + 1})`);
     const tick = el('input', {type: 'checkbox', id: `piece${i}`});
-    const label = el('label'); label.htmlFor = tick.id; label.append(tick, 'Collé dans TaleSpire');
+    tick.setAttribute('aria-label', `Morceau ${i + 1} collé dans TaleSpire`);
+    const label = el('label'); label.htmlFor = tick.id; label.append(tick, 'Collé');
     copy.onclick = async () => {
       if (!(await copyText(slices[x][y]))) return;
       // Copying is not pasting: only the visitor's own tick says it is done.
@@ -874,8 +882,7 @@ function renderPieces(slices, size, w, l, tooBig, code){
       announce(`Morceau ${i + 1} copié. Collez-le dans TaleSpire, puis cochez «\u00a0Collé\u00a0».`);
     };
     tick.onchange = () => markPiece(i, tick.checked);
-    const note = el('span', {className: 'copied-note'}, 'Copié : collez-le dans TaleSpire, puis cochez «\u00a0Collé\u00a0».');
-    li.append(el('span', {className: 'zone-badge'}, String(i + 1)), info, copy, note, label);
+    li.append(tag, sizeNote, copy, label);
     list.appendChild(li);
   }
   updatePieces();
@@ -898,7 +905,7 @@ function updatePieces(){
     li.classList.toggle('done', done.has(i));
     li.classList.toggle('next', i === next && i !== copied);
     li.classList.toggle('copied', i === copied);
-    li.querySelector('.copied-note').hidden = i !== copied;
+    li.querySelector('.piece-tag').textContent = (done.has(i) ? '✓ ' : '') + `Morceau ${i + 1}`;
     li.querySelector('input').checked = done.has(i);
     const button = li.querySelector('button');
     button.className = i === next && i !== copied ? 'primary' : 'ghost';

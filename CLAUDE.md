@@ -216,10 +216,12 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   not 76 + 76 + an 8-tile sliver). A 200×200 map comes out as 3×3 slabs of 67
   tiles, all under 22 kB. Only a slice still too dense at the 8-tile floor (a
   big building) is reported as a warning.
-- **Pasting a sliced map is a checklist.** The UI lists the pieces with their
-  size and row/column, concrete placement steps (paste piece 1 anywhere, then
-  each next one edge to edge as on the preview, unrotated), a Copier button and
-  a "Collé dans TaleSpire" tick per piece. Copying marks a piece "copié" (the app
+- **Pasting a sliced map is a checklist laid out like the cut.** The pieces are
+  tiles in a grid with the cut's own columns, right under the map in its
+  column (aligned with its edges), each tagged "Morceau N" like the labels on
+  the preview, with its size, a Copier button and a "Collé" tick; the sidebar
+  keeps the explanation, concrete placement steps (paste piece 1 anywhere, then
+  each next one edge to edge as on the preview, unrotated) and the progress. Copying marks a piece "copié" (the app
   cannot know it was pasted); only the visitor's tick counts it as pasted and
   moves the highlight to the next piece, in the list and on the preview. Ticks
   persist per map (`state.pieces`, keyed by an FNV hash of the code) and the
