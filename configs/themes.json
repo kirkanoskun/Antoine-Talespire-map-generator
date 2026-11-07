@@ -1,0 +1,250 @@
+[
+{
+  "id": "cimetiere",
+  "label": "Cimetière",
+  "objects": [
+    {
+      "uuid": "89e6faca-3b0c-41e6-bb2f-80c5c6eb0b03",
+      "role": "tombe"
+    },
+    {
+      "uuid": "0ec92df2-c6c9-4be4-85f9-ca340e102201",
+      "role": "tombe"
+    },
+    {
+      "uuid": "16865988-9e66-4add-a9ba-b5fc257afd5d",
+      "role": "tombe"
+    },
+    {
+      "uuid": "7ae5095a-d2a8-4f87-ac91-936425e85326",
+      "role": "tombe haute"
+    },
+    {
+      "uuid": "311c385d-6c34-4bcb-aa5a-dcf77bbb99eb",
+      "role": "tombe avec un corbeau"
+    },
+    {
+      "uuid": "33a69f83-2ced-42cd-a2a2-1aabe366f7db",
+      "role": "monument"
+    },
+    {
+      "uuid": "c687de23-a17d-4362-8faf-2eefe6fcd7da",
+      "role": "monument"
+    },
+    {
+      "uuid": "bc51680d-e791-462b-8d87-a96281dc9310",
+      "role": "monument"
+    },
+    {
+      "uuid": "7d4b36c7-4c2a-4e10-9ce5-cca0b4c85cbe",
+      "role": "sarcophage, pièce centrale"
+    },
+    {
+      "uuid": "2827c7a5-8ae7-426f-a495-29ee382243d1",
+      "role": "cercueil"
+    },
+    {
+      "uuid": "0a5aad94-8977-4e42-960c-a72159b10e6c",
+      "role": "grande statue encapuchonnée, pièce centrale"
+    },
+    {
+      "uuid": "08b1918a-7cdb-4643-8d14-008cd6d18feb",
+      "role": "clôture de 2 cases, orientée est-ouest"
+    },
+    {
+      "uuid": "7a33b43e-ef84-4e06-90bf-333412d88cdb",
+      "role": "clôture d'une case, orientée est-ouest"
+    },
+    {
+      "uuid": "a94d0fed-79c3-4317-af28-4ab04fd7e04e",
+      "role": "coin de clôture"
+    },
+    {
+      "uuid": "1e86ec31-8bfe-4db8-a489-2670468b980a",
+      "role": "clôture cassée, orientée est-ouest"
+    },
+    {
+      "uuid": "84ee0f89-1c06-467d-a3ef-7db0ef42768d",
+      "role": "poteau de clôture"
+    },
+    {
+      "uuid": "48583acf-ab32-40cf-990e-68096e080dd7",
+      "role": "portail, orienté est-ouest"
+    }
+  ]
+},
+{
+  "id": "place_village",
+  "label": "Place de village",
+  "objects": [
+    {
+      "uuid": "08545429-752c-41c5-9758-1279d82b70eb",
+      "role": "fontaine, pièce centrale"
+    },
+    {
+      "uuid": "ec5ceb75-0f02-4892-96bc-f82e55890a82",
+      "role": "puits"
+    },
+    {
+      "uuid": "54f1eaf1-63f2-4665-80f5-3287bd7cf79d",
+      "role": "statue de chevalier"
+    },
+    {
+      "uuid": "bab76375-3286-4eec-a9b1-b41558166773",
+      "role": "statue brisée"
+    },
+    {
+      "uuid": "554ac0fb-4489-41dd-80ce-aec63f0a8649",
+      "role": "étal de fruits"
+    },
+    {
+      "uuid": "829aef7b-412e-44d2-82b8-f9e425ad3c1f",
+      "role": "étal de légumes"
+    },
+    {
+      "uuid": "adf23589-a725-476b-bde0-df7d1dab48ba",
+      "role": "étal de légumes"
+    },
+    {
+      "uuid": "579700f7-e809-43e0-b058-9e1aa5d37cd0",
+      "role": "étal d'épices, d'angle"
+    },
+    {
+      "uuid": "ead12d1a-9acc-4fc6-81aa-9aef517f03b2",
+      "role": "étal vide"
+    },
+    {
+      "uuid": "c2d077af-f8ff-4dca-a897-5ea243e04d5b",
+      "role": "étal de magie"
+    },
+    {
+      "uuid": "b357d530-becf-4a05-8a4d-feffa4b907d0",
+      "role": "étal d'armes"
+    },
+    {
+      "uuid": "8d13bc1e-f05b-4c03-8d57-5a897e66693e",
+      "role": "charrette à bras"
+    },
+    {
+      "uuid": "99d33645-b866-4b17-a093-07b2eef7f684",
+      "role": "chariot bâché"
+    },
+    {
+      "uuid": "d9dcd448-2c03-4b16-a67e-54d8f4b11a04",
+      "role": "grande caisse"
+    },
+    {
+      "uuid": "2ed62f17-ca95-4705-a69d-6ee25930261a",
+      "role": "caisses empilées"
+    }
+  ]
+},
+{
+  "id": "marais",
+  "label": "Marais",
+  "objects": [
+    {
+      "uuid": "63650e1d-6b11-4807-afd1-17aaf3330a68",
+      "role": "roseaux"
+    },
+    {
+      "uuid": "a2d4ea14-e21c-43d2-a884-0037f6ac4c25",
+      "role": "roseaux"
+    },
+    {
+      "uuid": "3dae85f6-7870-4751-8e14-9a07e15cdb4b",
+      "role": "prêles"
+    },
+    {
+      "uuid": "f162d284-f144-4c62-8346-050ba33e4161",
+      "role": "prêles"
+    },
+    {
+      "uuid": "277edf44-e481-45a6-8a67-f91579e22778",
+      "role": "nénuphar, sur l'eau"
+    },
+    {
+      "uuid": "90e6eb4a-36ce-47db-b9dc-8ad6d69b12af",
+      "role": "nénuphar, sur l'eau"
+    },
+    {
+      "uuid": "2fa04957-41fa-480b-9099-8939dd25956d",
+      "role": "fleur de nénuphar, sur l'eau"
+    },
+    {
+      "uuid": "727132ed-63b0-484b-8184-e8e74d49cea8",
+      "role": "arche de racines"
+    }
+  ]
+},
+{
+  "id": "village_abandonne",
+  "label": "Village abandonné",
+  "objects": [
+    {
+      "uuid": "8944b901-5c4f-4503-bd7c-21f79dbd4095",
+      "role": "pan de mur percé, orienté est-ouest"
+    },
+    {
+      "uuid": "9c31287e-c3ac-42d8-a658-b2bdc2676dd6",
+      "role": "pan de mur percé, orienté est-ouest"
+    },
+    {
+      "uuid": "5665cebe-29c9-48f3-a67d-763b7b738c70",
+      "role": "pan de mur cassé, orienté est-ouest"
+    },
+    {
+      "uuid": "3b6623fd-5ae1-41c3-b811-a07da563fbe7",
+      "role": "angle de mur en ruine"
+    },
+    {
+      "uuid": "78c27766-b473-456a-8305-8a5cbf34a273",
+      "role": "mur en ruine de 2 cases, orienté est-ouest"
+    },
+    {
+      "uuid": "f5dbe998-db6d-407f-8738-ad7d0a33d18e",
+      "role": "plancher de maison effondrée"
+    },
+    {
+      "uuid": "9684fd47-24c1-41cc-9af3-430455c1ad6f",
+      "role": "escalier cassé"
+    },
+    {
+      "uuid": "c40e3251-efca-4f33-afdf-4554801b4eb5",
+      "role": "chariot en ruine"
+    },
+    {
+      "uuid": "7ae9daf4-0a7c-4f45-a04a-44d4db2c3716",
+      "role": "chariot renversé"
+    },
+    {
+      "uuid": "ec5ceb75-0f02-4892-96bc-f82e55890a82",
+      "role": "vieux puits"
+    },
+    {
+      "uuid": "510604be-2661-4da8-a440-da370f746fcc",
+      "role": "éboulis"
+    },
+    {
+      "uuid": "829e84f1-b425-4ff5-ac34-824ecea3d859",
+      "role": "tas de pierres"
+    },
+    {
+      "uuid": "a990c316-75dd-45dc-9cc3-cfb8bde0a9ff",
+      "role": "petit tas de gravats"
+    },
+    {
+      "uuid": "71edc3f6-ffd9-4971-be7b-c5002e984053",
+      "role": "tas de bois"
+    },
+    {
+      "uuid": "c3aa7f07-217c-4f99-81c6-6137637692c7",
+      "role": "buisson mort"
+    },
+    {
+      "uuid": "081bf189-f294-493d-9bf0-4d376af05ae5",
+      "role": "squelette"
+    }
+  ]
+}
+]

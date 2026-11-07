@@ -168,6 +168,15 @@ func (in *Interpreter) validate(raw string, opts Options) (*ir.IR, error) {
 				z.ID, z.ReliefOverride, doc.Map.Biome, strings.Join(in.catalog.Biomes[doc.Map.Biome], ", "))
 		}
 	}
+	if in.catalog.KnownProp != nil {
+		for i := range doc.Zones {
+			for _, poi := range doc.Zones[i].PointsOfInterest {
+				if !in.catalog.KnownProp(poi.Prop) {
+					return nil, fmt.Errorf("zone %q: point of interest prop %q does not exist; use a slug from the scene themes or a name from the point-of-interest vocabulary", doc.Zones[i].ID, poi.Prop)
+				}
+			}
+		}
+	}
 	for _, placement := range doc.Buildings {
 		building, ok := in.catalog.Prefabs.Get(placement.Prefab)
 		if !ok {

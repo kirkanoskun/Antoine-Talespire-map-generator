@@ -88,6 +88,7 @@ func main() {
 		log.Fatalf("loading catalog: %v", err)
 	}
 	catalog.Prefabs = prefabs
+	catalog.KnownProp = gen.KnownProp
 
 	// Only wire the natural-language backend when a credential is present. Without
 	// one the keyless prompt flow (/api/prompt) and the "apply edited IR" path

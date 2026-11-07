@@ -135,6 +135,7 @@ cmd/generate/         CLI: IR JSON -> TaleSpire code (+ PNG preview)
 cmd/describe/         CLI: NL description -> IR (-> optional code + preview)
 cmd/server/           HTTP server for the web UI
 cmd/web/              the same API compiled to WebAssembly, for the public website
+cmd/import-index/     TaleSpire pack index.json -> configs/assets.json (full catalogue)
 web/                  the browser bridge (cartographe.js) and response headers
 internal/ir/          IR types, strict JSON parsing & validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
@@ -142,8 +143,10 @@ internal/generator/   zone-aware slab generation, stitching, paths, mapper
 internal/preview/     top-down 2D PNG renderer
 internal/nl/          NL -> IR: Claude call, prompt, catalogue, validate+retry, Adjust
 internal/server/      HTTP API + embedded single-page UI, in-memory sessions
-internal/catalogs/    biome/prop catalogues parsed from bytes (no filesystem)
-configs/              biomes.json, props.json (copied from taleslab)
+internal/catalogs/    biome/prop catalogues parsed from bytes (no filesystem); full catalogue + themes
+configs/              biomes.json, props.json (from taleslab, extended); assets.json (full
+                      catalogue, generated); themes.json (scene themes); taleweaver/ (pack indexes)
+docs/specs/           delegable specs (lot 1: full catalogue and scene themes)
 testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
 
@@ -350,6 +353,60 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   architecture (`uname -m`) and builds only that, so it needs nothing but the Go
   toolchain (no `lipo`/Command Line Tools). `--universal` still fuses an
   Intel+Apple-Silicon binary when `lipo` is available.
+
+### Full TaleSpire catalogue and scene themes (lot 1, `docs/specs/lot1-catalogue-complet.md`)
+
+- **The whole game, not taleslab's 59 assets.** `configs/taleweaver/` versions
+  the two official pack indexes (Medieval Fantasy, Cyberpunk and Sci-fi) that
+  TaleSpire ships under `Taleweaver/<pack-uuid>/index.json`; `cmd/import-index`
+  turns them into `configs/assets.json` (2 875 non-deprecated tiles and props,
+  ~1 MiB, one entry per line, sorted by slug). `TestAssetCatalogueIsCurrent`
+  fails when it no longer matches the indexes (`-update` rewrites it), and
+  `TestOldCatalogueIsInTheFullOne` that every props.json/biomes.json id exists.
+  Only assets.json and themes.json are embedded, parsed once and shared
+  (`catalogs.Embedded`, ~20 ms native, ~130 ms in the browser engine).
+- **Ids and slugs.** An id is base64 of two zero bytes + the UUID in .NET byte
+  order (props.json's format; a Slab layout id is the last 16 bytes). Slugs are
+  the name lowercased with `_`; names shared by several assets add the folder,
+  then the UUID's first four characters (99 shared names); a nameless asset is
+  `asset_<uuid8>`. Themes reference assets by UUID, never by name.
+- **Resolution order (RG3).** A point of interest's `prop` is a props.json id or
+  an alias first (the old path, talescoder, random rotation: the golden is
+  untouched), then a catalogue slug, else a warning plus `Result.UnknownProps`.
+- **A catalogue object is a one-piece building.** `placeObjects` runs after the
+  buildings and before the scatter: it reserves a footprint of
+  `ceil(size - 0.15)` tiles per axis (fountain 2x2, wagon 2x5) whose north-west
+  corner is the POI position, levels it to its highest tile, and emits a
+  `slab.Layout` (the buildings' exact path), unrotated (lot 1), with the centre
+  of the object's bounds at the centre of the footprint (one formula for tiles,
+  whose origin is a corner, props, whose origin is their centre, and the odd
+  ones) and its origin on the surface `(h+1)*50` (gravestones are meant to be
+  half buried). Overlaps and off-map placements are skipped with a warning.
+  Scattered objects draw from their own random source, and the scatter still
+  draws its numbers on reserved tiles but does not emit there, so adding a
+  fountain changes nothing outside its footprint and the ground fill next to it
+  (`TestCatalogueObjectLeavesTheRestOfTheMap`). In-game validation pending.
+- **Themes, not the catalogue, in the prompt.** `configs/themes.json` holds four
+  curated themes (cimetiere, place_village, marais, village_abandonne; ~56
+  objects with a French role); `nl.Catalog.Themes` lists them as
+  `slug [w x d] role` (prompt v1.05, head 6.0 -> 9.2 kB). The keyless site gets
+  them through `prompt-head.txt` like the rest of the head.
+- **Unknown names go back to the AI.** With a key, `Catalog.KnownProp`
+  (= `generator.KnownProp`) makes an unknown prop fail validation, so the retry
+  loop corrects it. Without a key, `/api/generate` returns `unknown_props` and
+  the result screen shows a ready-to-send correction message; `poi_labels`
+  gives theme objects their French name in the zone list and warnings.
+- **New reliefs.** `paving` on temperate_forest uses "castle floor 1x1" (one
+  step tall, stackable; the CobbleStone tiles are a quarter tile and would leave
+  gaps); `swamp_floor` on swamp uses `mud_small`, which *is* "Swamp floor 1x1"
+  (the swamp's old ground, `dead_ground_small`, is actually lava ashes, left
+  alone), with reeds as misc. The swamp's water carries lily pads (`offset_z`
+  1, height to confirm in game). The preview draws flagstones and mud textures
+  and outlines each object's footprint with its pin at the centre.
+- **Size.** The engine grows from 14.1 to 15.2 MB raw (3.05 -> 3.30 MB gzip).
+- **Reference scenes.** `testdata/scene_place_village.json` and
+  `scene_cimetiere_marais.json` place every object without a warning
+  (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.
 
 ### Public website (Cloudflare Workers static assets)
 

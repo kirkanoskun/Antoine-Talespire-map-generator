@@ -113,7 +113,9 @@
   .err.info .err-title{color:var(--ink)}
   .err p{margin:0 0 6px}
   .err .err-title{font-weight:600; color:#f8d3c7}
-  .err blockquote{margin:10px 0; padding:10px 12px; background:var(--bg-2); border-radius:8px; color:var(--ink)}
+  .err blockquote, .unknown-fix blockquote{margin:10px 0; padding:10px 12px; background:var(--bg-2); border-radius:8px; color:var(--ink)}
+  .unknown-fix{margin-top:12px; max-width:62ch}
+  .unknown-fix .actions{margin-top:8px}
   .err details{margin-top:8px}
   .err code{display:block; margin-top:6px; color:var(--danger-ink); word-break:break-word}
 
@@ -154,6 +156,10 @@
     background-size:8px 8px}
   .swatch.waves{background-image:repeating-linear-gradient(0deg, transparent 0 4px, rgba(255,255,255,.3) 4px 5px)}
   .swatch.hatch{background-image:repeating-linear-gradient(45deg, rgba(25,25,25,.35) 0 1px, transparent 1px 4px)}
+  .swatch.flagstones{background-image:linear-gradient(rgba(25,25,25,.4) 1px, transparent 1px), linear-gradient(90deg, rgba(25,25,25,.4) 1px, transparent 1px);
+    background-size:8px 8px}
+  .swatch.mud{background-image:repeating-linear-gradient(0deg, transparent 0 3px, rgba(25,25,25,.35) 3px 4px); background-size:6px 8px}
+  .swatch.outline{border:2px solid #f6eede; box-shadow:0 0 0 1px #1b1511}
   .swatch.gravel{background-image:radial-gradient(rgba(25,25,25,.4) 0.8px, transparent 1.2px); background-size:5px 4px; background-position:1px 1px}
   .legend small{color:var(--muted); font-size:13px; margin-left:auto; font-variant-numeric:tabular-nums}
   .piece-label{position:absolute; margin:4px 0 0 4px; padding:0 5px; border-radius:4px; background:rgba(27,21,17,.8);
@@ -441,6 +447,14 @@
     </div>
     <div id="warningsWrap" hidden>
       <ul class="warnings" id="mapWarnings"></ul>
+      <div class="unknown-fix" id="unknownFix" hidden>
+        <p class="note">Votre IA a nommé des objets qui n’existent pas dans TaleSpire : ils manquent sur la carte. Envoyez-lui ce message, puis collez sa nouvelle réponse.</p>
+        <blockquote id="unknownFixText"></blockquote>
+        <div class="actions">
+          <button class="ghost" id="copyUnknownFix">Copier ce message pour l’IA</button>
+          <button class="link" id="unknownNext">J’ai la nouvelle réponse →</button>
+        </div>
+      </div>
     </div>
     <section class="panel retouch" aria-labelledby="retouchTitle">
       <h3 id="retouchTitle">Retoucher la carte</h3>
@@ -485,8 +499,9 @@ const BIOMES = {temperate_forest: 'Forêt tempérée', subtropical_forest: 'For�
   swamp: 'Marécage', desert: 'Désert', tundra: 'Toundra', lava: 'Volcanique', beach: 'Plage'};
 // What each preview colour stands for (keys come from the server's legend).
 const LEGEND_NAMES = {water: 'Eau', ground: 'Sol naturel', base_ground: 'Chemin, sol nu', mountain: 'Roche, relief',
-  ruins: 'Ruines', other: 'Autre terrain', building: 'Emprise de bâtiment', poi: 'Point d’intérêt',
-  tree: 'Arbres', stone: 'Rochers', misc: 'Buissons, fleurs, détails', boundary: 'Limite entre zones'};
+  ruins: 'Ruines', paving: 'Pavés', swamp_floor: 'Sol de marais', other: 'Autre terrain', building: 'Emprise de bâtiment',
+  poi: 'Point d’intérêt', footprint: 'Place occupée par un objet', tree: 'Arbres', stone: 'Rochers',
+  misc: 'Buissons, fleurs, détails', boundary: 'Limite entre zones'};
 // French names for the points of interest the generator understands.
 const POI_NAMES = {broken_pillar: 'colonne brisée', pillar: 'pilier', column: 'colonne', altar: 'autel',
   campfire: 'feu de camp', bonfire: 'grand feu', skull: 'crâne', skulls: 'tas de crânes', skeleton: 'squelette',
@@ -721,13 +736,22 @@ function zoneName(z){
   if (z.description) return z.description;
   return z.id.replace(/_/g, ' ');
 }
-function poiName(prop){ return POI_NAMES[prop] || prop.replace(/_/g, ' '); }
+// Scene-theme objects come with their French label from the server (the map
+// on screen sets them); anything else falls back to its name, spaced out.
+let poiLabels = {};
+function poiName(prop){ return POI_NAMES[prop] || poiLabels[prop] || prop.replace(/_/g, ' '); }
 const SLAB_LIMIT = 30000; // TaleSpire's per-paste limit, in bytes of code
 function frenchWarning(w){
   let m = w.match(/^zone "(.+)": unknown POI prop "(.+)" \(skipped\)$/);
   if (m) return `« ${poiName(m[2])} » n’existe pas dans TaleSpire : cet élément de la zone « ${m[1]} » est ignoré.`;
   m = w.match(/^zone "(.+)": POI "(.+)" overlaps a reserved building footprint/);
   if (m) return `« ${poiName(m[2])} » chevauche un bâtiment dans la zone « ${m[1]} » : il est ignoré.`;
+  m = w.match(/^zone "(.+)": POI "(.+)" overlaps another object/);
+  if (m) return `« ${poiName(m[2])} » chevauche un autre objet dans la zone « ${m[1]} » : il est ignoré.`;
+  m = w.match(/^zone "(.+)": POI "(.+)" needs (\d+)x(\d+) tiles at \((\d+),(\d+)\), outside the map/);
+  if (m) return `« ${poiName(m[2])} » (${m[3]} × ${m[4]} cases) dépasse du bord de la carte en (${m[5]}, ${m[6]}) : il est ignoré.`;
+  m = w.match(/^zone "(.+)": only (\d+) of (\d+) "(.+)" fit/);
+  if (m) return `Seuls ${m[2]} « ${poiName(m[4])} » sur ${m[3]} tiennent dans la zone « ${m[1]} ».`;
   return w;
 }
 function gridStep(size){ return [5, 10, 20, 25, 50, 100].find((v) => size / v <= 6) || 100; }
@@ -738,6 +762,7 @@ function el(tag, props = {}, text = ''){
 }
 
 function renderMap(data){
+  poiLabels = data.poi_labels || {};
   const doc = data.ir || {};
   const map = doc.map || {};
   const w = map.width || 1, l = map.length || 1;
@@ -752,7 +777,7 @@ function renderMap(data){
   $('revertWrap').hidden = !state.previousReply;
   // The alt text summarises what the image shows, for those who can't see it.
   const plural = {poi: 'points d’intérêt'};
-  const counted = (data.legend || []).filter((e) => e.count).map((e) =>
+  const counted = (data.legend || []).filter((e) => e.count && e.key !== 'footprint').map((e) =>
     `${e.count} ${(e.count > 1 && plural[e.key]) || (LEGEND_NAMES[e.key] || e.key).toLowerCase()}`);
   const terrain = (data.legend || []).filter((e) => !e.count && e.key !== 'boundary').map((e) => (LEGEND_NAMES[e.key] || e.key).toLowerCase());
   const img = el('img', {src: data.preview_url, alt: `Aperçu vu du dessus de la carte « ${map.name || 'sans nom'} » : ${zones.length} zones, terrain ${terrain.join(', ')}${counted.length ? ' ; ' + counted.join(', ') : ''}.`});
@@ -808,6 +833,7 @@ function renderMap(data){
     dot: (c) => `radial-gradient(circle, ${c} 0 28%, transparent 32%), ${groundColor}`,
     stone: (c) => `linear-gradient(${c}, ${c}) center / 7px 7px no-repeat, ${groundColor}`,
     line: (c) => `linear-gradient(${c}, ${c}) center / 100% 5px no-repeat, ${groundColor}`,
+    outline: () => groundColor,
   };
   const legend = (data.legend || []).map((entry) => {
     const li = el('li');
@@ -856,8 +882,20 @@ function renderMap(data){
   $('oversize').textContent = 'Un morceau reste trop lourd pour TaleSpire (plus de 30 ko environ) : il se collera, mais le plateau risque de ne pas s’enregistrer. Allégez la zone concernée ou réduisez la taille de la carte, puis redemandez-la.';
   const warnings = (data.warnings || []).filter((w) => !heavy.includes(w)).map(frenchWarning);
   $('mapWarnings').replaceChildren(...warnings.map((t) => el('li', {}, t)));
+  // Names the AI made up: one message asks it to swap them for real objects.
+  const unknown = data.unknown_props || [];
+  $('unknownFix').hidden = !unknown.length;
+  $('unknownFixText').textContent = unknown.length
+    ? `Ces objets n’existent pas dans le catalogue du Cartographe : ${unknown.map((n) => `« ${n} »`).join(', ')}. Remplacez chacun par un objet des thèmes de scène (son slug) ou du vocabulaire de points d’intérêt, sans rien changer d’autre, et renvoyez la carte complète en JSON.`
+    : '';
+  resetFlash($('copyUnknownFix'), 'Copier ce message pour l’IA');
   $('warningsWrap').hidden = !warnings.length;
 }
+$('copyUnknownFix').onclick = async () => {
+  if (await copyText($('unknownFixText').textContent)){ flash($('copyUnknownFix'), 'Message copié ✓', 'Copier ce message pour l’IA'); announce('Message copié.'); }
+  else selectContents($('unknownFixText'));
+};
+$('unknownNext').onclick = () => $('retouchNext').onclick();
 // A sliced map is pasted piece by piece: a checklist keeps track of what is
 // already on the board (ticks survive a reload, keyed to the map's code) and
 // highlights the next piece, in the list and on the preview.

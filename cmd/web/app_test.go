@@ -179,3 +179,26 @@ func TestPanicBecomesAnError(t *testing.T) {
 		t.Errorf("status %d, error %q", r.status, out.Error)
 	}
 }
+
+// A full-catalogue object lands in the slab; a made-up name comes back as
+// unknown_props, so the page can ask the visitor's AI to replace it.
+func TestCatalogueObjectsAndUnknownProps(t *testing.T) {
+	ir := `{"map":{"width":30,"length":30,"biome":"temperate_forest"},"zones":[{"id":"place","anchor":{"x":15,"y":15},"relative_size":1,"elevation":"flat",
+		"points_of_interest":[{"prop":"fountain_01","position":{"x":14,"y":14}},{"prop":"marble_fountain","position":{"x":3,"y":3}}]}]}`
+	r := call(handler(t), "POST", "/api/generate", `{"ir":`+ir+`}`)
+	var out struct {
+		Code         string            `json:"code"`
+		UnknownProps []string          `json:"unknown_props"`
+		POILabels    map[string]string `json:"poi_labels"`
+	}
+	decode(t, r, &out)
+	if r.status != http.StatusOK || len(out.UnknownProps) != 1 || out.UnknownProps[0] != "marble_fountain" {
+		t.Fatalf("status %d, unknown_props %v", r.status, out.UnknownProps)
+	}
+	if out.POILabels["fountain_01"] != "fontaine" {
+		t.Errorf("poi_labels = %v, want fountain_01 named fontaine", out.POILabels)
+	}
+	if !strings.Contains(string(r.body), `"warnings"`) || out.Code == "" {
+		t.Fatalf("no code: %s", r.body)
+	}
+}

@@ -9,7 +9,7 @@ import (
 
 // PromptVersion identifies the wording of the generated IR prompt. Bump it when
 // the instruction text changes so users can tell which revision they pasted.
-const PromptVersion = "1.04"
+const PromptVersion = "1.05"
 
 // clarifyingQuestions is the interactive preamble used only by the keyless
 // "generate a prompt" flow (BuildPrompt), where the user has a real back-and-forth
@@ -98,10 +98,31 @@ Notes:
 	data, _ := json.Marshal(c.Prefabs.List())
 	b.Write(data)
 	b.WriteString("\nFootprints are conservative estimates from asset origins, not mesh geometry.\n")
+	// Scene themes: real TaleSpire objects, placed exactly.
+	if len(c.Themes) > 0 {
+		b.WriteString(`
+# Scene themes (real TaleSpire objects)
+When the scene matches a theme, name its objects in points_of_interest by their slug: each one is the actual object from the game, not a stand-in. Format: slug [width x depth in tiles] role.
+- An object's position is the NORTH-WEST corner of its footprint; nothing else (scatter, another object) can stand on that footprint, so keep footprints apart.
+- Objects are placed unrotated: fences and walls run east-west.
+- "scattered" with a count also works for them (gravestones across a graveyard).
+`)
+		for _, th := range c.Themes {
+			fmt.Fprintf(&b, "- %s (%s): ", th.ID, th.Label)
+			for i, o := range th.Objects {
+				if i > 0 {
+					b.WriteString("; ")
+				}
+				fmt.Fprintf(&b, "%s [%dx%d] %s", o.Asset.Slug, o.Asset.Footprint[0], o.Asset.Footprint[1], o.Role)
+			}
+			b.WriteString("\n")
+		}
+	}
+
 	// POI vocabulary.
-	b.WriteString("\n# Point-of-interest vocabulary (prefer these names; they resolve to real props)\n")
+	b.WriteString("\n# Point-of-interest vocabulary (generic names; prefer a theme's object when one fits)\n")
 	b.WriteString(strings.Join(c.POINames, ", "))
-	b.WriteString("\n")
+	b.WriteString("\nAny other prop name is rejected.\n")
 
 	if interactive {
 		b.WriteString(`

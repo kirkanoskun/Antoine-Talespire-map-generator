@@ -55,6 +55,7 @@ type Generator struct {
 	smoothingPasses int
 	sliceSize       int
 	prefabs         *prefab.Store
+	assets          *catalogs.AssetCatalog // the full catalogue, for points of interest
 }
 
 // New loads the biome and prop catalogues from the given config paths.
@@ -85,9 +86,13 @@ func NewFromJSON(biomesJSON, propsJSON []byte) (*Generator, error) {
 }
 
 func newGenerator(biomes domainrepos.BiomeRepository, props domainrepos.PropRepository) *Generator {
+	// The embedded catalogue is checked by tests; a defect there leaves the
+	// generator with the original catalogue only, and unknown names warn.
+	assets, _ := Assets()
 	return &Generator{
 		biomes:          biomes,
 		props:           props,
+		assets:          assets,
 		enc:             encoder.NewEncoder(),
 		transitionHalf:  defaultTransitionHalfWidth,
 		smoothingPasses: 2,
@@ -129,6 +134,9 @@ type Result struct {
 	AssetCount int          // total assets placed
 	Height     *HeightField // per-tile height/relief, for preview and inspection
 	Warnings   []string     // non-fatal issues (unknown POI props, oversized slabs)
+	// UnknownProps lists, once each and in order of appearance, the point-of-
+	// interest names that resolved to nothing, so the AI can be asked to fix them.
+	UnknownProps []string
 }
 
 // HeightField exposes the shaped terrain so the preview renderer can shade it.
@@ -140,6 +148,9 @@ type HeightField struct {
 	dug       [][]bool // ground removed under a building's underground part
 	pois      [][2]int // tiles where a point of interest was actually placed
 	props     [][]PropKind
+	// Full-catalogue objects: their footprints, reserved before the scatter.
+	objects     []PlacedObject
+	objectTiles [][]bool
 }
 
 // PropKind is the scatter a tile carries on top of its ground (at most one
@@ -223,11 +234,16 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		return nil, err
 	}
 	res := &Result{Height: field}
+	objectParts, err := g.placeObjects(doc, mask, field, seed, res)
+	if err != nil {
+		return nil, err
+	}
 	var placements []placement
 	placements = g.placeGround(placements, biome, field, rng)
 	placements = g.placeProps(placements, biome, doc, field, trans, paths, rng)
 	placements = g.placePOIs(placements, doc, mask, field, rng, res)
 	placements = append(placements, buildingParts...)
+	placements = append(placements, objectParts...)
 	res.AssetCount = len(placements)
 
 	// Whole-map slab (always produced, for a single copy-paste).
@@ -557,10 +573,16 @@ func (g *Generator) placeProps(out []placement, biome *taleslabentities.Biome, d
 					continue
 				}
 				rot := randomRotation(rng)
+				occupied[x][y] = true
+				if f.ObjectAt(x, y) {
+					// The tile belongs to a catalogue object. Everything up to
+					// here ran as if it did not, so the random sequence and the
+					// spacing, and with them the rest of the map, are unchanged.
+					break
+				}
 				for _, part := range prop.Parts {
 					out = append(out, placement{part: part, tileX: x, tileY: y, z: t.height + part.OffsetZ, baseRotation: rot})
 				}
-				occupied[x][y] = true
 				f.props[x][y] = cat.kind
 				if cat.kind == PropTree && t.relief == string(elementtype.Water) {
 					f.props[x][y] = PropMisc // underwater "vegetation" is coral, not a tree
@@ -577,11 +599,16 @@ func (g *Generator) placePOIs(out []placement, doc *ir.IR, mask *spatial.Mask, f
 	for zi := range doc.Zones {
 		zone := &doc.Zones[zi]
 		for _, poi := range zone.PointsOfInterest {
-			propID := resolvePropAlias(poi.Prop)
-			prop := g.props.GetProp(propID)
+			prop, asset := g.resolvePOI(poi.Prop)
+			if asset != nil {
+				continue // a full-catalogue object, placed by placeObjects
+			}
 			if prop == nil {
 				res.Warnings = append(res.Warnings,
 					fmt.Sprintf("zone %q: unknown POI prop %q (skipped)", zone.ID, poi.Prop))
+				if !contains(res.UnknownProps, poi.Prop) {
+					res.UnknownProps = append(res.UnknownProps, poi.Prop)
+				}
 				continue
 			}
 
@@ -596,6 +623,10 @@ func (g *Generator) placePOIs(out []placement, doc *ir.IR, mask *spatial.Mask, f
 				x, y := p[0], p[1]
 				if f.BuildingAt(x, y) {
 					res.Warnings = append(res.Warnings, fmt.Sprintf("zone %q: POI %q overlaps a reserved building footprint (skipped)", zone.ID, poi.Prop))
+					continue
+				}
+				if f.ObjectAt(x, y) {
+					res.Warnings = append(res.Warnings, fmt.Sprintf("zone %q: POI %q overlaps another object (skipped)", zone.ID, poi.Prop))
 					continue
 				}
 				f.pois = append(f.pois, [2]int{x, y})
@@ -811,4 +842,13 @@ func scatterInZone(mask *spatial.Mask, zoneIdx, count int, rng *rand.Rand) [][2]
 		count = len(tiles)
 	}
 	return tiles[:count]
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

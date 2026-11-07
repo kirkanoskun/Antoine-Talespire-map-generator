@@ -3,6 +3,7 @@
 Projet : Le Cartographe (`kirkanoskun/Antoine-Talespire-map-generator`)
 Version : v2, 7 novembre 2026 (v1 du 27 octobre 2026, amendée après revue du code et des deux index).
 Destinataire : session Claude Code sur le dépôt.
+Statut : implémenté (7 novembre 2026) ; reste la validation en jeu par Antoine (US5), avec `testdata/scene_place_village.json` et `testdata/scene_cimetiere_marais.json`.
 Mode : spec déléguable. Lire `CLAUDE.md` avant de commencer, ses règles priment (un biome par carte, IR validée à la frontière, sorties déterministes).
 
 ## Ce qui a changé depuis la v1
