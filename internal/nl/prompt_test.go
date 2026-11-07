@@ -23,8 +23,8 @@ func TestBuildPromptAsksClarifyingQuestionsAndVersion(t *testing.T) {
 			t.Errorf("BuildPrompt missing %q", want)
 		}
 	}
-	if PromptVersion != "1.03" {
-		t.Errorf("PromptVersion = %q, want 1.03", PromptVersion)
+	if PromptVersion != "1.04" {
+		t.Errorf("PromptVersion = %q, want 1.04", PromptVersion)
 	}
 }
 

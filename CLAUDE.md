@@ -248,7 +248,10 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   if told to). This is added only in the interactive prompt — `systemPrompt(false)`
   used by the automated `/api/describe` path stays single-shot JSON, since its
   reply must satisfy the validate/retry loop. `nl.PromptVersion` carries the
-  wording revision and is printed at the top of the generated prompt.
+  wording revision and is printed at the top of the generated prompt. Since
+  v1.04 a zone's `description` is asked for as a short label the GM reads, in
+  the description's language with its accents and no technical terms ("Mare au
+  centre de la cour", not "pond (zone imbriquee)"), since the UI shows it.
 - **The paste-back reads the AI's whole reply.** Visitors paste ChatGPT's answer
   as-is (French prose, a ```json fence). `/api/generate` therefore also takes
   `{"text": ...}` and extracts the object with `nl.ExtractJSON`, the same reader
@@ -267,8 +270,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   `.impeccable/critique/` keeps the critique snapshots and their scores.
 - **The preview shows what the slab contains.** Every placed point of interest
   is drawn, scattered ones included (`HeightField.POIs`), as a light pin with a
-  dark ring (value and shape, not hue); ruins carry a masonry texture and paths a
-  distinct sand, since height shading brings stone colours together. The
+  dark ring (value and shape, not hue); ruins carry a masonry texture and paths
+  (`base_ground`) a muted sand with a gravel grain, since height shading brings
+  stone colours together (a saturated sand read as a bright bar across the map). The
   scatter is drawn too (`HeightField.PropAt`, one prop per tile): trees as dark
   canopies wider than their tile (trees are never side by side, so they are
   painted after all the ground), rocks as light stones with a shadow, bushes and
@@ -286,7 +290,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **Retouching stays plain language.** Step 4's "Retoucher la carte" turns a
   request ("déplace la mare plus au sud") into a message carrying the current IR
   for the visitor's AI, whose new reply is pasted back; with a key (desktop) it
-  calls `/api/adjust` directly. Raw JSON editing is the secondary path.
+  calls `/api/adjust` directly. Raw JSON editing is the secondary path. Step 4
+  keeps one primary action, copying the code: the retouch button is a ghost
+  until a request is typed, then takes the primary style.
 - **The engine's first download is visible.** `web/cartographe.js` tees the
   `app.wasm` stream to count bytes and emits `cartographe:progress/ready/failed`;
   `build-web.sh` writes the uncompressed size into it (Cloudflare serves the
@@ -299,8 +305,12 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   `TestPromptIsHeadPlusSceneLines` holds the engine to that contract and the
   browser journey checks the early prompt is identical to the engine's.
 - **The landing shows a result before anything is asked.** Step 1 carries the
-  castle example's real preview (`static/exemple-carte.png`, 300 px, 7.5 kB)
-  with "Partir de cet exemple". `TestSampleMapIsCurrent` fails when it no
+  castle example's real preview (`static/exemple-carte.png`, 300 px, 7.5 kB).
+  The sample *is* the first of three example chips, and its caption quotes that
+  chip word for word, so there is no separate "start from this" button. The
+  landing grid has three areas — form, sample, more (chips, options) — so on a
+  phone the result comes right after the form, before the options.
+  `TestSampleMapIsCurrent` fails when it no
   longer matches what the generator draws; after a deliberate preview change,
   run `go test ./internal/server -run TestSampleMapIsCurrent -update`.
 - **Runs without a key.** With no Anthropic credential the server still serves

@@ -1,5 +1,5 @@
 {
-  "map": { "width": 50, "length": 50, "name": "Cour de chateau en ruines", "biome": "temperate_forest" },
+  "map": { "width": 50, "length": 50, "name": "Cour de château en ruines", "biome": "temperate_forest" },
   "zones": [
     {
       "id": "courtyard",
@@ -7,7 +7,7 @@
       "relative_size": 0.4,
       "elevation": "flat",
       "density_overrides": { "vegetation": 0.05, "stones": 0.1 },
-      "description": "Cour centrale pavee, herbe eparse"
+      "description": "Cour centrale, herbe éparse"
     },
     {
       "id": "pond",
@@ -15,7 +15,7 @@
       "relative_size": 0.1,
       "elevation": "depression",
       "relief_override": "water",
-      "description": "Mare au centre de la cour (zone imbriquee)"
+      "description": "Mare au centre de la cour"
     },
     {
       "id": "ruins_north",

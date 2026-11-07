@@ -84,13 +84,16 @@
 
   .eyebrow{font-size:13px; color:var(--muted); margin:36px 0 12px}
   /* Step 1: the form, and beside it an example of what comes out. */
-  .landing{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:40px; align-items:start}
+  .landing{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:0 40px; align-items:start;
+    grid-template-areas:"form sample" "more sample"}
+  .landing-form{grid-area:form} .landing-more{grid-area:more} .sample{grid-area:sample}
   .sample{margin:26px 0 0}
   .sample img{display:block; width:100%; height:auto; image-rendering:pixelated; border:1px solid var(--control);
     outline:1px solid var(--border); outline-offset:4px}
   .sample figcaption{margin-top:14px; font-size:14px; color:var(--muted)}
   .sample figcaption b{display:block; color:var(--ink); font-weight:600; margin-bottom:2px}
-  @media(max-width:860px){ .landing{grid-template-columns:1fr; gap:8px} .sample{max-width:300px} }
+  /* On a phone the result comes right after the form, before the options. */
+  @media(max-width:860px){ .landing{grid-template-columns:1fr; grid-template-areas:"form" "sample" "more"} .sample{max-width:300px} }
   .chips{display:flex; flex-wrap:wrap; gap:8px}
   .chip{background:var(--panel); border:1px solid var(--border); color:var(--ink); border-radius:999px;
     padding:8px 14px; cursor:pointer; text-align:left; font-size:14px;
@@ -155,6 +158,7 @@
     background-size:8px 8px}
   .swatch.waves{background-image:repeating-linear-gradient(0deg, transparent 0 4px, rgba(255,255,255,.3) 4px 5px)}
   .swatch.hatch{background-image:repeating-linear-gradient(45deg, rgba(25,25,25,.35) 0 1px, transparent 1px 4px)}
+  .swatch.gravel{background-image:radial-gradient(rgba(25,25,25,.4) 0.8px, transparent 1.2px); background-size:5px 4px; background-position:1px 1px}
   .legend small{color:var(--muted); font-size:13px; margin-left:auto; font-variant-numeric:tabular-nums}
   .piece-label{position:absolute; margin:4px 0 0 4px; padding:0 5px; border-radius:4px; background:rgba(27,21,17,.8);
     color:var(--ink); font-size:11px; font-weight:600; line-height:18px}
@@ -253,7 +257,7 @@
     <p class="lead">Racontez la scène comme à votre table : le décor, l’ambiance, les éléments clés. Le Cartographe prépare un prompt pour votre assistant IA, puis transforme sa réponse en carte TaleSpire.</p>
 
     <div class="landing">
-      <div class="landing-main">
+      <div class="landing-form">
       <label for="desc">Votre scène</label>
       <textarea id="desc" aria-describedby="descErr" aria-keyshortcuts="Control+Enter Meta+Enter"
         placeholder="Ex. Une cour de château en ruines, une mare au sud, des vestiges au nord…"></textarea>
@@ -266,11 +270,12 @@
       </div>
       <p class="engine" id="engineStatus" role="status" hidden><span id="engineText">Chargement du moteur de génération…</span><progress id="engineBar" max="1" value="0"></progress></p>
       <p class="note"><button class="link" id="pasteDirect">Vous avez déjà la réponse de l’IA ? Collez-la directement</button></p>
+      </div>
 
+      <div class="landing-more">
       <p class="eyebrow" id="examplesLabel">Pas d’idée ? Partez d’un exemple :</p>
       <div class="chips" id="examples" role="group" aria-labelledby="examplesLabel">
-        <button class="chip">Une cour de château en ruines, une mare au sud, des vestiges au nord.</button>
-        <button class="chip">Une clairière de forêt tempérée avec un étang paisible et un chemin de pierre.</button>
+        <button class="chip">Une cour de château en ruines, une mare en son centre, des vestiges au nord.</button>
         <button class="chip">Un désert aride avec des dunes, une oasis cachée et des ruines antiques.</button>
         <button class="chip">Un marécage brumeux avec des huttes sur pilotis et un autel oublié.</button>
       </div>
@@ -321,8 +326,7 @@
       <figure class="sample">
         <img src="/static/exemple-carte.png" width="300" height="300"
           alt="Exemple de carte vue du dessus : une cour herbeuse semée d’arbres et de rochers, une mare ronde en son centre, des ruines au nord reliées par un chemin.">
-        <figcaption><b>Exemple de résultat</b>« Une cour de château en ruines, une mare en son centre, des vestiges au nord. »
-          <button class="link" id="trySample">Partir de cet exemple</button></figcaption>
+        <figcaption><b>Exemple de résultat</b>Ce que donne le premier exemple : «&nbsp;Une cour de château en ruines, une mare en son centre, des vestiges au nord.&nbsp;»</figcaption>
       </figure>
     </div>
   </section>
@@ -426,7 +430,7 @@
       <label for="retouchText" class="sr-only">Changement souhaité</label>
       <textarea id="retouchText" placeholder="Ex. déplace la mare plus au sud, ajoute des arbres morts autour des ruines"></textarea>
       <div class="actions">
-        <button class="primary" id="retouchBtn">Copier la demande pour l’IA</button>
+        <button class="ghost" id="retouchBtn">Copier la demande pour l’IA</button>
         <button class="ghost" id="retouchNext" hidden>J’ai la nouvelle réponse →</button>
       </div>
       <p class="note" id="retouchNote" role="status" aria-live="polite"></p>
@@ -610,11 +614,7 @@ async function preparePrompt(){
 $('genPrompt').onclick = preparePrompt;
 onCtrlEnter($('desc'), preparePrompt);
 $('pasteDirect').onclick = () => setStep(3);
-$('trySample').onclick = () => {
-  $('desc').value = 'Une cour de château en ruines, une mare en son centre, des vestiges au nord.';
-  state.desc = $('desc').value; save(); showDescErr('');
-  $('desc').focus();
-};
+
 
 // Step 2: one obvious action, copy; the prompt itself stays folded away.
 function renderPrompt(){
@@ -970,8 +970,12 @@ function retouchRequest(change){
   return 'Voici la carte actuelle du Cartographe :\n\n```json\n' + JSON.stringify(result.ir) + '\n```\n\n'
     + `Modifiez-la seulement ainsi : « ${change} ». Gardez tout le reste identique, respectez les mêmes règles que pour la carte d’origine, et renvoyez le JSON complet de la carte, sans autre texte.`;
 }
+// Copying the map stays the one primary action on step 4; the retouch button
+// only takes the accent once there is a request to send.
+function updateRetouchButton(){ $('retouchBtn').className = $('retouchText').value.trim() ? 'primary' : 'ghost'; }
+$('retouchText').addEventListener('input', updateRetouchButton);
 function resetRetouch(){
-  $('retouchText').value = ''; $('retouchNote').textContent = '';
+  $('retouchText').value = ''; $('retouchNote').textContent = ''; updateRetouchButton();
   $('retouchNext').hidden = true; $('retouchFallback').hidden = true;
 }
 function updateRetouchMode(){
