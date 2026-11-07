@@ -38,6 +38,7 @@ func newHandler() (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading catalog: %w", err)
 	}
+	catalog.KnownProp = gen.KnownProp
 	srv := server.New(gen, server.Options{
 		Catalog:      catalog,
 		PreviewScale: 8,

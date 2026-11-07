@@ -1,0 +1,93 @@
+{
+  "map": {
+    "width": 40,
+    "length": 40,
+    "name": "Cimetière du marais",
+    "biome": "swamp"
+  },
+  "zones": [
+    {
+      "id": "marais",
+      "anchor": {
+        "x": 20,
+        "y": 20
+      },
+      "relative_size": 0.7,
+      "elevation": "flat",
+      "relief_override": "swamp_floor",
+      "description": "Marais"
+    },
+    {
+      "id": "mare",
+      "anchor": {
+        "x": 8,
+        "y": 30
+      },
+      "relative_size": 0.15,
+      "elevation": "depression",
+      "description": "Mare"
+    },
+    {
+      "id": "cimetiere",
+      "anchor": {
+        "x": 20,
+        "y": 18
+      },
+      "relative_size": 0.25,
+      "elevation": "hill",
+      "density_overrides": {
+        "vegetation": 0,
+        "misc": 0.02,
+        "stones": 0
+      },
+      "description": "Cimetière",
+      "points_of_interest": [
+        {
+          "prop": "sarcophagus",
+          "position": {
+            "x": 20,
+            "y": 17
+          }
+        },
+        {
+          "prop": "statue_lg_hooded_01",
+          "position": {
+            "x": 19,
+            "y": 13
+          }
+        },
+        {
+          "prop": "gravestone_01",
+          "position": "scattered",
+          "count": 10
+        },
+        {
+          "prop": "gravestone_with_crow_01",
+          "position": "scattered",
+          "count": 2
+        },
+        {
+          "prop": "graveyard_fence_01",
+          "position": {
+            "x": 15,
+            "y": 11
+          }
+        },
+        {
+          "prop": "graveyard_fence_01",
+          "position": {
+            "x": 17,
+            "y": 11
+          }
+        },
+        {
+          "prop": "doors_graveyard_fence",
+          "position": {
+            "x": 19,
+            "y": 24
+          }
+        }
+      ]
+    }
+  ]
+}

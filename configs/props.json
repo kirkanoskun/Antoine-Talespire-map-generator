@@ -1018,5 +1018,125 @@
         }
       }
     ]
+  },
+  {
+    "id": "castle_floor_1x1",
+    "asset_parts": [
+      {
+        "id": "AADi8uqi2AFIRaUXUN+FUQV6",
+        "name": "castle_floor_1x1",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 0
+      }
+    ]
+  },
+  {
+    "id": "swamp_reed_01",
+    "asset_parts": [
+      {
+        "id": "AAAdDmVjEWsHSK/RF6rzMwpo",
+        "name": "swamp_reed_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_reed_02",
+    "asset_parts": [
+      {
+        "id": "AAAU6tSiHOLSQ6iEADf2rEwl",
+        "name": "swamp_reed_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_reed_horsetail_01",
+    "asset_parts": [
+      {
+        "id": "AAD2ha49cHhRR44UmgfhXNtL",
+        "name": "swamp_reed_horsetail_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_reed_horsetail_04",
+    "asset_parts": [
+      {
+        "id": "AACE0mLxRPFiTINGBQujPkFh",
+        "name": "swamp_reed_horsetail_04",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_lily_pad_01",
+    "asset_parts": [
+      {
+        "id": "AABE334ngeSmRYpn+RV54id4",
+        "name": "swamp_lily_pad_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_lily_pad_02",
+    "asset_parts": [
+      {
+        "id": "AABK6+aQzjbbR7ncitbWmxKv",
+        "name": "swamp_lily_pad_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_lily_flower",
+    "asset_parts": [
+      {
+        "id": "AABXSaAv+kELSJCZiTndJZVt",
+        "name": "swamp_lily_flower",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
   }
 ]

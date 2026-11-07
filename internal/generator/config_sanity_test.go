@@ -181,3 +181,48 @@ func TestConfigMiscNotBoneDominated(t *testing.T) {
 		}
 	}
 }
+
+// The lot 1 reliefs: paving on temperate_forest (a full-step stone floor, as
+// the quarter-tile cobblestones would leave gaps when stacked), swamp_floor on
+// swamp (the real swamp floor), and lily pads on the swamp's water.
+func TestConfigSceneReliefs(t *testing.T) {
+	var biomes biomeCatalog
+	loadJSON(t, "biomes.json", &biomes)
+	relief := func(biome, key string) (blocks []string, veg, misc []string) {
+		for _, b := range biomes {
+			if b.BiomeType != biome {
+				continue
+			}
+			for _, r := range b.Reliefs {
+				if r.Key == key {
+					return r.BuildingBlocks, r.PropBlocks["vegetation"].Props, r.PropBlocks["misc"].Props
+				}
+			}
+		}
+		t.Fatalf("%s has no %s relief", biome, key)
+		return nil, nil, nil
+	}
+	if blocks, _, _ := relief("temperate_forest", "paving"); len(blocks) != 1 || blocks[0] != "castle_floor_1x1" {
+		t.Errorf("paving blocks = %v", blocks)
+	}
+	if blocks, _, misc := relief("swamp", "swamp_floor"); len(blocks) != 1 || blocks[0] != "mud_small" || misc[0] != "swamp_reed_01" {
+		t.Errorf("swamp_floor blocks = %v, misc = %v", blocks, misc)
+	}
+	if _, veg, _ := relief("swamp", "water"); len(veg) != 3 || veg[0] != "swamp_lily_pad_01" {
+		t.Errorf("swamp water vegetation = %v", veg)
+	}
+	cat, err := Assets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The new entries come from the full catalogue, ids and all.
+	var props propCatalog
+	loadJSON(t, "props.json", &props)
+	for _, p := range props {
+		if a, ok := cat.BySlug(p.ID); ok && p.ID != "fire" {
+			if len(p.Parts) != 1 || p.Parts[0].ID != a.ID {
+				t.Errorf("props.json %s does not carry the catalogue's id %s", p.ID, a.ID)
+			}
+		}
+	}
+}

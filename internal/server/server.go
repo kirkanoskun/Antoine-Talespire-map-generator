@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/catalogs"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/nl"
@@ -177,12 +178,18 @@ func (s *Server) handleQuit(w http.ResponseWriter, r *http.Request) {
 }
 
 type genResponse struct {
-	Session    string                `json:"session"`
-	IR         json.RawMessage       `json:"ir"`
-	Code       string                `json:"code"`
-	Slices     [][]string            `json:"slices,omitempty"`
-	SliceSize  int                   `json:"slice_size,omitempty"`
-	Warnings   []string              `json:"warnings"`
+	Session   string          `json:"session"`
+	IR        json.RawMessage `json:"ir"`
+	Code      string          `json:"code"`
+	Slices    [][]string      `json:"slices,omitempty"`
+	SliceSize int             `json:"slice_size,omitempty"`
+	Warnings  []string        `json:"warnings"`
+	// UnknownProps are point-of-interest names that exist nowhere, once each:
+	// the UI asks the visitor's AI to replace them.
+	UnknownProps []string `json:"unknown_props,omitempty"`
+	// POILabels names, in French, the scene-theme objects the map uses, so the
+	// zone list says "fontaine" rather than a catalogue slug.
+	POILabels  map[string]string     `json:"poi_labels,omitempty"`
 	Attempts   int                   `json:"attempts"`
 	PreviewURL string                `json:"preview_url"`
 	Legend     []preview.LegendEntry `json:"legend"`
@@ -406,16 +413,18 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 
 	irJSON, _ := json.Marshal(doc)
 	writeJSON(w, http.StatusOK, genResponse{
-		Session:    id,
-		IR:         irJSON,
-		Code:       res.Code,
-		Slices:     res.Slices,
-		SliceSize:  res.SliceSize,
-		Warnings:   res.Warnings,
-		Attempts:   attempts,
-		PreviewURL: fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),
-		Legend:     preview.Legend(doc, res.Height),
-		Labels:     mask.LabelPoints(),
+		Session:      id,
+		IR:           irJSON,
+		Code:         res.Code,
+		Slices:       res.Slices,
+		SliceSize:    res.SliceSize,
+		Warnings:     res.Warnings,
+		UnknownProps: res.UnknownProps,
+		POILabels:    poiLabels(doc),
+		Attempts:     attempts,
+		PreviewURL:   fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),
+		Legend:       preview.Legend(doc, res.Height),
+		Labels:       mask.LabelPoints(),
 	})
 }
 
@@ -494,4 +503,30 @@ func newID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
+}
+
+// poiLabels maps each scene-theme object the IR names to its French label.
+func poiLabels(doc *ir.IR) map[string]string {
+	_, themes, err := catalogs.Embedded()
+	if err != nil {
+		return nil
+	}
+	labels := map[string]string{}
+	for _, th := range themes {
+		for _, o := range th.Objects {
+			labels[o.Asset.Slug] = o.Label()
+		}
+	}
+	out := map[string]string{}
+	for _, z := range doc.Zones {
+		for _, p := range z.PointsOfInterest {
+			if l, ok := labels[p.Prop]; ok {
+				out[p.Prop] = l
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

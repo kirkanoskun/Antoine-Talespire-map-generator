@@ -26,12 +26,17 @@ var reliefPalette = map[string]color.RGBA{
 	"ground":      {70, 130, 65, 255},
 	"mountain":    {125, 120, 118, 255},
 	"ruins":       {150, 140, 125, 255},
+	"paving":      {178, 170, 152, 255}, // a village square's flagstones
+	"swamp_floor": {92, 96, 62, 255},    // swamp mud, darker and duller than grass
 }
 
 // texturedReliefs are told apart by pattern as well as colour, so the map
 // never relies on hue alone (ruins and mountain are close in value once
 // height-shaded, water and ground in luminance): the legend reports it.
-var texturedReliefs = map[string]string{"ruins": "masonry", "water": "waves", "mountain": "hatch", "base_ground": "gravel"}
+var texturedReliefs = map[string]string{
+	"ruins": "masonry", "water": "waves", "mountain": "hatch", "base_ground": "gravel",
+	"paving": "flagstones", "swamp_floor": "mud",
+}
 
 var (
 	boundaryColor  = color.RGBA{25, 25, 25, 255}
@@ -47,13 +52,14 @@ var (
 
 // reliefOrder fixes the legend order of the known reliefs (the palette is a
 // map, and output must not depend on map iteration).
-var reliefOrder = []string{"water", "ground", "base_ground", "mountain", "ruins"}
+var reliefOrder = []string{"water", "ground", "base_ground", "swamp_floor", "mountain", "ruins", "paving"}
 
 // LegendEntry is one swatch of the preview's key: what a colour stands for.
 // Key is a relief key, "other" (a relief outside the palette), "building",
 // "tree", "stone", "misc", "boundary" or "poi"; the UI translates it. Color is
 // the unshaded "#rrggbb"; Pattern names a texture drawn over it ("masonry",
-// "waves", "hatch", "gravel") or a symbol ("tree", "stone", "dot", "line", "pin").
+// "waves", "hatch", "gravel", "flagstones", "mud") or a symbol ("tree",
+// "stone", "dot", "line", "pin", "outline").
 // Count is how many are drawn, for the scatter and points of interest.
 type LegendEntry struct {
 	Key     string `json:"key"`
@@ -107,8 +113,11 @@ func Legend(doc *ir.IR, field *generator.HeightField) []LegendEntry {
 	if len(doc.Zones) > 1 {
 		out = append(out, LegendEntry{"boundary", hex(blend(ground, boundaryColor, 0.45)), "line", 0})
 	}
-	if n := len(field.POIs()); n > 0 {
+	if n := len(field.POIs()) + len(field.Objects()); n > 0 {
 		out = append(out, LegendEntry{"poi", hex(poiColor), "pin", n})
+	}
+	if n := len(field.Objects()); n > 0 {
+		out = append(out, LegendEntry{"footprint", hex(poiColor), "outline", n})
 	}
 	return out
 }
@@ -163,6 +172,10 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 					hatch(img, x, y, scale, blend(base, boundaryColor, 0.18))
 				case "gravel":
 					gravel(img, x, y, scale, blend(base, boundaryColor, 0.22))
+				case "flagstones":
+					flagstones(img, x, y, scale, blend(base, boundaryColor, 0.28))
+				case "mud":
+					mud(img, x, y, scale, blend(base, boundaryColor, 0.3))
 				}
 			}
 		}
@@ -189,9 +202,15 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 			marker(img, z.Anchor.X, z.Anchor.Y, scale, anchorColor)
 		}
 	}
-	// Every point of interest actually placed, scattered ones included.
+	// Every point of interest actually placed, scattered ones included. A
+	// full-catalogue object also shows the footprint it reserves, outlined, with
+	// its pin at the centre: a fountain covers 2x2 tiles.
 	for _, p := range field.POIs() {
 		pin(img, p[0], p[1], scale)
+	}
+	for _, o := range field.Objects() {
+		outline(img, o.X*scale, o.Y*scale, o.W*scale, o.D*scale)
+		pinAt(img, float64(o.X*scale)+float64(o.W*scale)/2, float64(o.Y*scale)+float64(o.D*scale)/2, scale)
 	}
 	return img
 }
@@ -245,6 +264,49 @@ func gravel(img *image.RGBA, tx, ty, scale int, c color.RGBA) {
 	}
 }
 
+// flagstones draws a joint along a tile's top and left edges: square slabs,
+// unlike the staggered masonry of ruins.
+func flagstones(img *image.RGBA, tx, ty, scale int, joint color.RGBA) {
+	x0, y0 := tx*scale, ty*scale
+	for i := 0; i < scale; i++ {
+		img.SetRGBA(x0+i, y0, joint)
+		img.SetRGBA(x0, y0+i, joint)
+	}
+}
+
+// mud draws two short dark streaks per tile, offset row to row.
+func mud(img *image.RGBA, tx, ty, scale int, c color.RGBA) {
+	x0, y0 := tx*scale, ty*scale
+	off := (ty % 2) * scale / 3
+	for i := 0; i < scale/3; i++ {
+		img.SetRGBA(x0+(off+i)%scale, y0+scale/4, c)
+		img.SetRGBA(x0+(off+scale/2+i)%scale, y0+3*scale/4, c)
+	}
+}
+
+// outline draws a footprint's border, light inside a dark line so it reads on
+// any terrain.
+func outline(img *image.RGBA, x0, y0, w, h int) {
+	b := img.Bounds()
+	set := func(x, y int, c color.RGBA) {
+		if image.Pt(x, y).In(b) {
+			img.SetRGBA(x, y, c)
+		}
+	}
+	for i := 0; i < w; i++ {
+		set(x0+i, y0, poiRingColor)
+		set(x0+i, y0+h-1, poiRingColor)
+		set(x0+i, y0+1, poiColor)
+		set(x0+i, y0+h-2, poiColor)
+	}
+	for j := 0; j < h; j++ {
+		set(x0, y0+j, poiRingColor)
+		set(x0+w-1, y0+j, poiRingColor)
+		set(x0+1, y0+j, poiColor)
+		set(x0+w-2, y0+j, poiColor)
+	}
+}
+
 // disc fills a circle of radius r centred on a tile.
 func disc(img *image.RGBA, tx, ty, scale int, r float64, c color.RGBA) {
 	cx, cy := float64(tx*scale)+float64(scale)/2, float64(ty*scale)+float64(scale)/2
@@ -275,7 +337,11 @@ func stone(img *image.RGBA, tx, ty, scale int) {
 // pin draws a point of interest as a light disc with a dark ring, centred on
 // its tile, so it stands out by value and shape rather than by hue.
 func pin(img *image.RGBA, tx, ty, scale int) {
-	cx, cy := float64(tx*scale)+float64(scale)/2, float64(ty*scale)+float64(scale)/2
+	pinAt(img, float64(tx*scale)+float64(scale)/2, float64(ty*scale)+float64(scale)/2, scale)
+}
+
+// pinAt draws a pin centred on pixel (cx, cy).
+func pinAt(img *image.RGBA, cx, cy float64, scale int) {
 	r := float64(scale)/2 + 1.5
 	b := img.Bounds()
 	for x := int(cx - r - 1); x <= int(cx+r+1); x++ {

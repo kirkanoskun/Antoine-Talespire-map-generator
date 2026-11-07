@@ -1,0 +1,89 @@
+{
+  "map": {
+    "width": 40,
+    "length": 40,
+    "name": "Place du marché",
+    "biome": "temperate_forest"
+  },
+  "zones": [
+    {
+      "id": "place",
+      "anchor": {
+        "x": 20,
+        "y": 20
+      },
+      "relative_size": 0.5,
+      "elevation": "flat",
+      "relief_override": "paving",
+      "description": "Place pavée",
+      "points_of_interest": [
+        {
+          "prop": "fountain_01",
+          "position": {
+            "x": 19,
+            "y": 19
+          }
+        },
+        {
+          "prop": "stall_fruit_01",
+          "position": {
+            "x": 15,
+            "y": 15
+          }
+        },
+        {
+          "prop": "stall_vegetables_01",
+          "position": {
+            "x": 17,
+            "y": 15
+          }
+        },
+        {
+          "prop": "stall_magic",
+          "position": {
+            "x": 23,
+            "y": 15
+          }
+        },
+        {
+          "prop": "stall_weapons",
+          "position": {
+            "x": 23,
+            "y": 24
+          }
+        },
+        {
+          "prop": "well_01",
+          "position": {
+            "x": 15,
+            "y": 23
+          }
+        },
+        {
+          "prop": "wooden_cart",
+          "position": {
+            "x": 18,
+            "y": 25
+          }
+        },
+        {
+          "prop": "stacked_crates",
+          "position": {
+            "x": 16,
+            "y": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "bois",
+      "anchor": {
+        "x": 5,
+        "y": 5
+      },
+      "relative_size": 0.5,
+      "elevation": "hill",
+      "description": "Bois autour du village"
+    }
+  ]
+}

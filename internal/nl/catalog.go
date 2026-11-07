@@ -29,6 +29,13 @@ type Catalog struct {
 	Biomes map[string][]string
 	// POINames is the sorted list of understood point-of-interest names.
 	POINames []string
+	// Themes are curated full-catalogue objects per kind of scene, offered to
+	// the model with their footprints (the whole catalogue would not fit).
+	Themes []catalogs.Theme
+	// KnownProp, when set, reports whether a point-of-interest name resolves to
+	// something placeable (generator.KnownProp). An unknown name then sends the
+	// IR back to the model instead of being skipped on the map.
+	KnownProp func(name string) bool
 }
 
 // LoadCatalog reads the biome catalogue and records each biome's relief keys.
@@ -38,7 +45,7 @@ func LoadCatalog(biomesPath string, poiNames []string) (*Catalog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading biomes: %w", err)
 	}
-	return newCatalog(repo, poiNames), nil
+	return newCatalog(repo, poiNames)
 }
 
 // NewCatalog is LoadCatalog for a biomes.json already in memory (the browser
@@ -48,10 +55,10 @@ func NewCatalog(biomesJSON []byte, poiNames []string) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCatalog(repo, poiNames), nil
+	return newCatalog(repo, poiNames)
 }
 
-func newCatalog(repo domainrepos.BiomeRepository, poiNames []string) *Catalog {
+func newCatalog(repo domainrepos.BiomeRepository, poiNames []string) (*Catalog, error) {
 	biomes := map[string][]string{}
 	for biomeType, biome := range repo.GetBiomes() {
 		reliefs := make([]string, 0, len(biome.Reliefs))
@@ -63,7 +70,11 @@ func newCatalog(repo domainrepos.BiomeRepository, poiNames []string) *Catalog {
 	}
 	names := append([]string(nil), poiNames...)
 	sort.Strings(names)
-	return &Catalog{Biomes: biomes, POINames: names}
+	_, themes, err := catalogs.Embedded()
+	if err != nil {
+		return nil, fmt.Errorf("loading scene themes: %w", err)
+	}
+	return &Catalog{Biomes: biomes, POINames: names, Themes: themes}, nil
 }
 
 // biomeNames returns the sorted biome ids.

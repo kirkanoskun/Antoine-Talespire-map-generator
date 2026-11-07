@@ -70,3 +70,37 @@ func TestDenseWoodLooksDifferentFromClearing(t *testing.T) {
 func luminance(c color.RGBA) float64 {
 	return 0.2126*float64(c.R) + 0.7152*float64(c.G) + 0.0722*float64(c.B)
 }
+
+// A full-catalogue object shows the footprint it reserves: a 2x2 fountain is
+// outlined across its four tiles, and the legend explains the outline.
+func TestCatalogueObjectFootprintIsDrawn(t *testing.T) {
+	doc, err := ir.Parse([]byte(`{"map":{"width":20,"length":20,"biome":"temperate_forest"},
+		"zones":[{"id":"place","anchor":{"x":10,"y":10},"relative_size":1,"elevation":"flat","relief_override":"paving",
+		"points_of_interest":[{"prop":"fountain_01","position":{"x":8,"y":8}}]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen, err := generator.New(repoPath("configs", "biomes.json"), repoPath("configs", "props.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mask := spatial.Resolve(doc)
+	res, err := gen.Generate(doc, mask, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img := Render(doc, mask, res.Height, Options{Scale: 8})
+	// The outline's dark line runs along the footprint's edges, 16 px apart.
+	for _, p := range [][2]int{{64, 64}, {64 + 15, 64}, {64, 64 + 15}, {64 + 15, 64 + 15}, {70, 64}} {
+		if c := img.RGBAAt(p[0], p[1]); c != poiRingColor {
+			t.Errorf("pixel %v = %v, want the outline's dark line", p, c)
+		}
+	}
+	keys := map[string]int{}
+	for _, e := range Legend(doc, res.Height) {
+		keys[e.Key] = e.Count
+	}
+	if _, paving := keys["paving"]; keys["footprint"] != 1 || keys["poi"] != 1 || !paving {
+		t.Errorf("legend = %v, want one footprint, one point of interest, paving listed", keys)
+	}
+}

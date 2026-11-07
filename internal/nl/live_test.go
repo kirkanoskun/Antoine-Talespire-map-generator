@@ -59,12 +59,12 @@ func TestInterpretLiveDescriptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("catalog: %v", err)
 	}
-	interp := nl.NewInterpreter(nl.NewAnthropicCompleter(nl.AnthropicConfig{}), catalog)
-
 	gen, err := generator.New(biomesPath, propsPath)
 	if err != nil {
 		t.Fatalf("generator: %v", err)
 	}
+	catalog.KnownProp = gen.KnownProp
+	interp := nl.NewInterpreter(nl.NewAnthropicCompleter(nl.AnthropicConfig{}), catalog)
 	dec := decoder.NewDecoder()
 
 	for i, desc := range readDescriptions(t) {

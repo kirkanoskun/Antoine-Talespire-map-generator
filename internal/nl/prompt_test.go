@@ -1,6 +1,7 @@
 package nl
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -23,8 +24,8 @@ func TestBuildPromptAsksClarifyingQuestionsAndVersion(t *testing.T) {
 			t.Errorf("BuildPrompt missing %q", want)
 		}
 	}
-	if PromptVersion != "1.04" {
-		t.Errorf("PromptVersion = %q, want 1.04", PromptVersion)
+	if PromptVersion != "1.05" {
+		t.Errorf("PromptVersion = %q, want 1.05", PromptVersion)
 	}
 }
 
@@ -38,4 +39,40 @@ func TestAPISystemPromptHasNoClarifyingQuestions(t *testing.T) {
 	if !strings.Contains(api, "Return ONLY the JSON document") {
 		t.Error("non-interactive systemPrompt should keep the immediate output contract")
 	}
+}
+
+// The scene themes reach the prompt with their slugs and footprints, and the
+// whole catalogue does not.
+func TestPromptListsSceneThemes(t *testing.T) {
+	c, err := NewCatalog(mustRead(t, "../../configs/biomes.json"), []string{"altar"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := c.PromptHead()
+	for _, want := range []string{
+		"# Scene themes",
+		"- cimetiere (Cimetière): gravestone_01 [1x1] tombe",
+		"fountain_01 [2x2] fontaine, pièce centrale",
+		"- marais (Marais):",
+		"- village_abandonne (Village abandonné):",
+		"NORTH-WEST corner of its footprint",
+		"fences and walls run east-west",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("prompt is missing %q", want)
+		}
+	}
+	if strings.Contains(p, "aberration_decor01") {
+		t.Error("the whole catalogue must not be in the prompt")
+	}
+	t.Logf("prompt head: %d bytes", len(p))
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

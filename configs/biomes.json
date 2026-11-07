@@ -302,6 +302,32 @@
       ]
      }
     }
+   },
+   {
+    "key": "paving",
+    "building_blocks": [
+     "castle_floor_1x1"
+    ],
+    "prop_blocks": {
+     "vegetation": {
+      "weight": 0,
+      "props": [
+       "one_big_tree"
+      ]
+     },
+     "stones": {
+      "weight": 0.01,
+      "props": [
+       "one_small_rock-z1"
+      ]
+     },
+     "misc": {
+      "weight": 0.03,
+      "props": [
+       "few_ground_red_leaves"
+      ]
+     }
+    }
    }
   ],
   "stone_wall": "big_stone_wall"
@@ -1002,9 +1028,11 @@
     ],
     "prop_blocks": {
      "vegetation": {
-      "weight": 0.01,
+      "weight": 0.06,
       "props": [
-       "coral"
+       "swamp_lily_pad_01",
+       "swamp_lily_pad_02",
+       "swamp_lily_flower"
       ]
      },
      "stones": {
@@ -1122,6 +1150,36 @@
        "pile_of_skulls",
        "down_skeleton",
        "up_skeleton"
+      ]
+     }
+    }
+   },
+   {
+    "key": "swamp_floor",
+    "building_blocks": [
+     "mud_small"
+    ],
+    "prop_blocks": {
+     "vegetation": {
+      "weight": 0.05,
+      "props": [
+       "pine_tree_big"
+      ]
+     },
+     "stones": {
+      "weight": 0.01,
+      "props": [
+       "stone_big"
+      ]
+     },
+     "misc": {
+      "weight": 0.2,
+      "props": [
+       "swamp_reed_01",
+       "swamp_reed_02",
+       "swamp_reed_horsetail_01",
+       "swamp_reed_horsetail_04",
+       "small_fern"
       ]
      }
     }

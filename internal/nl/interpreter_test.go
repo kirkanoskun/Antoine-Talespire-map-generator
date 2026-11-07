@@ -137,3 +137,26 @@ func TestExtractJSON(t *testing.T) {
 		}
 	}
 }
+
+// A point of interest the generator cannot place goes back to the model, like
+// any invalid IR, rather than silently vanishing from the map.
+func TestInterpretRejectsUnknownProp(t *testing.T) {
+	withProp := func(prop string) string {
+		return strings.Replace(validIR, `"elevation": "flat"}`,
+			`"elevation": "flat", "points_of_interest": [{"prop": "`+prop+`", "position": {"x": 20, "y": 20}}]}`, 1)
+	}
+	cat := testCatalog()
+	cat.KnownProp = func(name string) bool { return name == "fountain_01" }
+	fc := &fakeCompleter{responses: []string{withProp("marble_fountain"), withProp("fountain_01")}}
+	res, err := NewInterpreter(fc, cat).Interpret(context.Background(), "x", Options{MaxRetries: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Attempts) != 2 || !strings.Contains(res.Attempts[0].Error, `"marble_fountain" does not exist`) {
+		t.Fatalf("attempts = %+v", res.Attempts)
+	}
+	last := fc.lastMsgs[len(fc.lastMsgs)-1].Text
+	if !strings.Contains(last, "scene themes") {
+		t.Errorf("the correction sent to the model should point to the themes: %q", last)
+	}
+}

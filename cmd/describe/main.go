@@ -78,6 +78,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("loading catalog: %v", err)
 	}
+	gen, err := generator.New(*biomes, *props)
+	if err != nil {
+		log.Fatalf("initialising generator: %v", err)
+	}
+	catalog.KnownProp = gen.KnownProp
 
 	catalog.Prefabs = prefabs
 	interpreter := nl.NewInterpreter(
@@ -118,10 +123,6 @@ func main() {
 
 	// Chain into the Phase 1 generation pipeline.
 	mask := spatial.Resolve(res.IR)
-	gen, err := generator.New(*biomes, *props)
-	if err != nil {
-		log.Fatalf("initialising generator: %v", err)
-	}
 	gen.SetPrefabs(prefabs)
 	gen.SetTransitionHalfWidth(*transition)
 	gres, err := gen.Generate(res.IR, mask, *seed)
