@@ -43,7 +43,6 @@
   .step{display:flex; align-items:center; gap:8px; background:none; border:0; border-radius:8px; padding:6px 8px;
     color:var(--muted-2); font:inherit; font-size:13px; white-space:nowrap; cursor:pointer}
   .step:disabled{cursor:default; opacity:1}
-  .step:not(:disabled):hover{color:var(--ink)}
   .step .dot{width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-size:12px;
     font-weight:600; color:var(--muted); border:1px solid var(--control)}
   .step.active{color:var(--ink)}
@@ -53,7 +52,6 @@
   .steps-compact button.link{margin-left:8px; font-size:13px}
   .quit{background:transparent; border:1px solid var(--control); color:var(--muted); border-radius:8px;
     padding:7px 12px; cursor:pointer; font:inherit; font-size:13px}
-  .quit:hover{color:var(--ink); border-color:var(--accent)}
 
   main{max-width:960px; margin:0 auto; padding:40px 24px 72px}
 
@@ -64,6 +62,8 @@
   textarea, input, select{width:100%; background:var(--bg-2); color:var(--ink); border:1px solid var(--control);
     border-radius:var(--radius); padding:14px; font:inherit}
   textarea{resize:vertical; min-height:150px}
+  /* iPhone Safari zooms the page into any field under 16px. */
+  @media (pointer:coarse){ textarea, input, select{font-size:16px} }
   textarea:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent)}
   ::placeholder{color:var(--muted-2); opacity:1}
 
@@ -72,11 +72,9 @@
   @media (hover:none){ .kbd-hint{display:none} }
   button{font:inherit}
   button.primary{background:var(--accent); color:var(--accent-ink); border:1px solid var(--accent); border-radius:9px;
-    padding:12px 22px; font-weight:600; cursor:pointer; transition:background-color .15s var(--ease)}
-  button.primary:hover{background:#ea9d4c}
+    padding:12px 22px; font-weight:600; cursor:pointer; transition:background-color .15s var(--ease), transform .16s var(--ease)}
   button.ghost{background:transparent; border:1px solid var(--control); color:var(--ink); border-radius:9px;
-    padding:12px 18px; font-weight:600; cursor:pointer; transition:border-color .15s var(--ease)}
-  button.ghost:hover{border-color:var(--accent)}
+    padding:12px 18px; font-weight:600; cursor:pointer; transition:border-color .15s var(--ease), transform .16s var(--ease)}
   button.link{background:none; border:0; padding:4px 0; color:var(--accent); cursor:pointer; text-decoration:underline;
     text-underline-offset:3px; font-size:14px}
   button:disabled{opacity:.55; cursor:default}
@@ -97,12 +95,10 @@
   .chips{display:flex; flex-wrap:wrap; gap:8px}
   .chip{background:var(--panel); border:1px solid var(--border); color:var(--ink); border-radius:999px;
     padding:8px 14px; cursor:pointer; text-align:left; font-size:14px;
-    transition:border-color .15s var(--ease), background-color .15s var(--ease)}
-  .chip:hover{border-color:var(--accent); background:var(--panel-2)}
+    transition:border-color .15s var(--ease), background-color .15s var(--ease), transform .16s var(--ease)}
 
   details.adv{margin:28px 0 0; border-top:1px solid var(--border); padding-top:18px}
   details > summary{cursor:pointer; color:var(--muted); font-size:14px; width:max-content; max-width:100%}
-  details > summary:hover{color:var(--ink)}
   .adv-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:16px}
   @media(max-width:620px){.adv-grid{grid-template-columns:1fr}}
 
@@ -208,7 +204,6 @@
 
   .site-footer{max-width:960px; margin:0 auto; padding:0 24px 36px; text-align:center; font-size:13px; color:var(--muted-2)}
   .site-footer a{color:var(--muted); text-decoration:none}
-  .site-footer a:hover{color:var(--accent)}
 
   @media (max-width:860px){
     .steps ol{display:none}
@@ -224,7 +219,30 @@
     .cartouche{font-size:24px}
     .survey{grid-template-columns:24px minmax(0,1fr)}
   }
-  @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+
+  /* Hover only where there is a pointer to hover with: on a phone a tapped
+     chip would otherwise stay lit as if it were selected. */
+  @media (hover:hover) and (pointer:fine){
+    .step:not(:disabled):hover{color:var(--ink)}
+    .quit:hover{color:var(--ink); border-color:var(--accent)}
+    button.primary:hover{background:#ea9d4c}
+    button.ghost:hover{border-color:var(--accent)}
+    .chip:hover{border-color:var(--accent); background:var(--panel-2)}
+    details > summary:hover{color:var(--ink)}
+    .site-footer a:hover{color:var(--accent)}
+  }
+  /* A press is acknowledged by the button itself, not the browser's grey flash. */
+  button, .chip{-webkit-tap-highlight-color:transparent}
+
+  /* Arrivals fade in, so a new step, an error or a redrawn map is seen to
+     change rather than just being there. Opacity only for reduced motion;
+     movement (the press, the step's rise) only for everyone else. */
+  main > section, .err, .map-cell img{transition:opacity .2s var(--ease), transform .2s var(--ease)}
+  @starting-style{ main > section, .err, .map-cell img{opacity:0} }
+  @media (prefers-reduced-motion: no-preference){
+    button.primary:not(:disabled):active, button.ghost:not(:disabled):active, .chip:active{transform:scale(.97)}
+    @starting-style{ main > section{transform:translateY(6px)} }
+  }
 </style>
 </head>
 <body>
@@ -499,7 +517,6 @@ function restore(){
   } catch {}
 }
 
-const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function reachable(n){ return n === 1 || n === 3 || (n === 2 && !!state.prompt) || (n === 4 && !!result); }
 // The step indicator only offers steps that already hold something; the
 // "paste directly" link is the way to jump ahead to step 3.
@@ -527,7 +544,9 @@ function setStep(n, {push = true, focus = true} = {}){
   $('stepsMap').hidden = !result || n === 4;
   if (push) history.pushState({step: n}, '');
   if (focus){
-    window.scrollTo({top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
+    // Jump, don't glide: the new step is already on screen, and Ctrl+Enter
+    // gets here too. The step's own fade-in carries the change.
+    window.scrollTo({top: 0, behavior: 'auto'});
     $('s' + n).querySelector('h2').focus({preventScroll: true});
   }
 }
@@ -545,23 +564,29 @@ async function postJSON(url, body){
 async function copyText(text){
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }
+// A button keeps its width while its label changes, so a pressed button
+// never shrinks under the pointer or shoves its neighbours.
+function holdWidth(btn){ btn.style.minWidth = btn.offsetWidth ? btn.offsetWidth + 'px' : ''; }
+function releaseWidth(btn){ btn.style.minWidth = ''; }
 // Briefly confirms an action on its button. A second click restarts the
 // timer instead of stacking one, and "back" is always the button's own label.
 function flash(btn, label, back){
+  if (!btn.flashTimer) holdWidth(btn);
   clearTimeout(btn.flashTimer);
   btn.textContent = label;
-  btn.flashTimer = setTimeout(() => { btn.textContent = back; }, 1600);
+  btn.flashTimer = setTimeout(() => { btn.textContent = back; btn.flashTimer = null; releaseWidth(btn); }, 1600);
 }
-function resetFlash(btn, label){ clearTimeout(btn.flashTimer); btn.textContent = label; }
+function resetFlash(btn, label){ clearTimeout(btn.flashTimer); btn.flashTimer = null; btn.textContent = label; releaseWidth(btn); }
 function selectContents(el){
   const range = document.createRange(); range.selectNodeContents(el);
   const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
 }
 async function busy(btn, label, work){
   const idle = btn.textContent;
+  holdWidth(btn);
   btn.disabled = true; btn.textContent = label;
   try { await work(); } finally {
-    btn.disabled = false; btn.textContent = idle;
+    btn.disabled = false; btn.textContent = idle; releaseWidth(btn);
     // Disabling the focused button dropped focus to <body>: give it back.
     if (document.activeElement === document.body && !btn.closest('[hidden]')) btn.focus();
   }

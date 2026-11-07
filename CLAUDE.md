@@ -313,6 +313,18 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   `TestSampleMapIsCurrent` fails when it no
   longer matches what the generator draws; after a deliberate preview change,
   run `go test ./internal/server -run TestSampleMapIsCurrent -update`.
+- **Motion and touch follow Emil Kowalski's rules (`emil-design-eng` review).**
+  Buttons and chips scale to 0.97 on press (160 ms ease-out). Hover styles live
+  under `(hover:hover) and (pointer:fine)`, so a tapped chip doesn't stay lit
+  on a phone, and the browser's tap highlight is off. Fields are 16 px under
+  `pointer:coarse`, because iPhone Safari zooms into anything smaller. A step,
+  an error or a redrawn map fades in via `@starting-style` (opacity, plus a
+  6 px rise for steps). Movement is dropped under reduced motion; fades stay.
+  Changing steps scrolls to the top instantly: the content has already
+  changed, and Ctrl+Enter triggers it too. `busy()` and `flash()` hold a
+  button's width while its label changes. In Playwright, take full-page
+  screenshots after touch checks: a full-page screenshot drops the touch
+  emulation.
 - **Runs without a key.** With no Anthropic credential the server still serves
   the UI and the `/api/generate` (paste/edit IR) path; `/api/describe` and
   `/api/adjust` return 503 with a clear message.
