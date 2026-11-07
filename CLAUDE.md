@@ -219,10 +219,11 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **Pasting a sliced map is a checklist.** The UI lists the pieces with their
   size and row/column, concrete placement steps (paste piece 1 anywhere, then
   each next one edge to edge as on the preview, unrotated), a Copier button and
-  a "Collé dans TaleSpire" tick per piece. Copying ticks it; the next piece is
-  highlighted in the list and on the preview; ticks persist per map
-  (`state.pieces`, keyed by an FNV hash of the code) and the list closes on a
-  "carte complète" message.
+  a "Collé dans TaleSpire" tick per piece. Copying marks a piece "copié" (the app
+  cannot know it was pasted); only the visitor's tick counts it as pasted and
+  moves the highlight to the next piece, in the list and on the preview. Ticks
+  persist per map (`state.pieces`, keyed by an FNV hash of the code) and the
+  list closes on a "carte complète" message.
 
 ### Phase 4 web UI & iteration notes
 
