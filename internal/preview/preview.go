@@ -22,7 +22,7 @@ import (
 // not listed fall back to fallbackRelief.
 var reliefPalette = map[string]color.RGBA{
 	"water":       {60, 110, 180, 255},
-	"base_ground": {214, 186, 120, 255}, // paths: a sand clearly lighter than stone
+	"base_ground": {190, 172, 134, 255}, // paths: a muted sand, lighter than stone, with gravel
 	"ground":      {70, 130, 65, 255},
 	"mountain":    {125, 120, 118, 255},
 	"ruins":       {150, 140, 125, 255},
@@ -31,7 +31,7 @@ var reliefPalette = map[string]color.RGBA{
 // texturedReliefs are told apart by pattern as well as colour, so the map
 // never relies on hue alone (ruins and mountain are close in value once
 // height-shaded, water and ground in luminance): the legend reports it.
-var texturedReliefs = map[string]string{"ruins": "masonry", "water": "waves", "mountain": "hatch"}
+var texturedReliefs = map[string]string{"ruins": "masonry", "water": "waves", "mountain": "hatch", "base_ground": "gravel"}
 
 var (
 	boundaryColor  = color.RGBA{25, 25, 25, 255}
@@ -53,7 +53,7 @@ var reliefOrder = []string{"water", "ground", "base_ground", "mountain", "ruins"
 // Key is a relief key, "other" (a relief outside the palette), "building",
 // "tree", "stone", "misc", "boundary" or "poi"; the UI translates it. Color is
 // the unshaded "#rrggbb"; Pattern names a texture drawn over it ("masonry",
-// "waves", "hatch") or a symbol ("tree", "stone", "dot", "line", "pin").
+// "waves", "hatch", "gravel") or a symbol ("tree", "stone", "dot", "line", "pin").
 // Count is how many are drawn, for the scatter and points of interest.
 type LegendEntry struct {
 	Key     string `json:"key"`
@@ -161,6 +161,8 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 					waves(img, x, y, scale, blend(base, white, 0.22))
 				case "hatch":
 					hatch(img, x, y, scale, blend(base, boundaryColor, 0.18))
+				case "gravel":
+					gravel(img, x, y, scale, blend(base, boundaryColor, 0.22))
 				}
 			}
 		}
@@ -228,6 +230,18 @@ func hatch(img *image.RGBA, tx, ty, scale int, c color.RGBA) {
 				img.SetRGBA(x0+i, y0+j, c)
 			}
 		}
+	}
+}
+
+// gravel sprinkles a few pebbles over a path tile, at spots hashed from the
+// tile so the grain looks loose rather than gridded, yet stays reproducible.
+func gravel(img *image.RGBA, tx, ty, scale int, c color.RGBA) {
+	x0, y0 := tx*scale, ty*scale
+	h := uint32(tx)*73856093 ^ uint32(ty)*19349663
+	for k := 0; k < 3; k++ {
+		h = h*1103515245 + 12345
+		px, py := int(h>>8)%scale, int(h>>20)%scale
+		img.SetRGBA(x0+px, y0+py, c)
 	}
 }
 

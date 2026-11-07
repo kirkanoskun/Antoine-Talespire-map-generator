@@ -9,7 +9,7 @@ import (
 
 // PromptVersion identifies the wording of the generated IR prompt. Bump it when
 // the instruction text changes so users can tell which revision they pasted.
-const PromptVersion = "1.03"
+const PromptVersion = "1.04"
 
 // clarifyingQuestions is the interactive preamble used only by the keyless
 // "generate a prompt" flow (BuildPrompt), where the user has a real back-and-forth
@@ -69,7 +69,7 @@ The grid is x in [0, width) and y in [0, length). x grows to the east, y grows t
         { "prop": string, "position": {"x": int, "y": int} },
         { "prop": string, "position": "scattered", "count": int }
       ],
-      "description": string               // optional, short
+      "description": string               // optional: a short label the GM reads, in the description's language with its accents (e.g. "Mare au centre de la cour"), no technical terms
     }
   ],
   "connections": [ { "from": string, "to": string, "type": string, "width": int } ], // optional
