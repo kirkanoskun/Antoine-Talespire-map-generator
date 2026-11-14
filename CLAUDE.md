@@ -137,6 +137,7 @@ cmd/server/           HTTP server for the web UI
 cmd/web/              the same API compiled to WebAssembly, for the public website
 cmd/import-index/     TaleSpire pack index.json -> configs/assets.json (full catalogue)
 web/                  the browser bridge (cartographe.js) and response headers
+e2e/                  browser checks on the built website (node e2e/run.js)
 internal/ir/          IR types, strict JSON parsing & validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
 internal/generator/   zone-aware slab generation, stitching, paths, mapper
@@ -147,6 +148,7 @@ internal/catalogs/    biome/prop catalogues parsed from bytes (no filesystem); f
 configs/              biomes.json, props.json (from taleslab, extended); assets.json (full
                       catalogue, generated); themes.json (scene themes); taleweaver/ (pack indexes)
 docs/specs/           delegable specs (lot 1: full catalogue and scene themes)
+docs/review-*.md      project reviews; the latest holds the improvement plan
 testdata/             castle.json, twozones.json, transition.json, nested.json, descriptions.txt
 ```
 
@@ -407,6 +409,45 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.
+
+### Fallbacks (review of 2026-11-14, `docs/review-2026-11-14.md`)
+
+- **AI replies are read leniently.** `/api/generate` uses `ir.ParseLenient`:
+  strict `ir.Parse` first, so a valid map is returned unchanged; otherwise the
+  decoded tree is repaired (decimals rounded, unknown fields dropped, French or
+  capitalised biome/elevation/density words folded, sizes given as percentages,
+  anchors and positions clamped into the map, positions as a pair or a word,
+  missing counts, duplicate ids, an oversize map scaled down with its
+  coordinates, comments and trailing commas stripped) and re-parsed strictly, so
+  `Validate` stays the final gate. Catalogue-aware fallbacks then run on every
+  document (`generator.Lenient()`): an unknown `relief_override` becomes the
+  nearest relief of the biome or is cleared, an unknown building or a path
+  between missing zones is dropped, a prop name is matched loosely, a path is
+  at most 9 wide. Each change is an `ir.Repair{code, zone, field, from, to}`,
+  returned as `repairs`; the UI turns the codes into French (`frenchRepair`)
+  under the map, opened when something asked for is missing. No zones, an
+  unknown biome and non-JSON are still errors (repairing them would be guessing
+  the scene). `ir.Parse` itself stays strict (CLIs, the keyed retry loop).
+  `FuzzParseLenient` holds it to "never panics, never accepts an invalid map".
+- **`nl.ExtractJSON` takes the last complete map** when a reply holds several
+  objects or stray braces; a truncated reply still yields the truncated span,
+  so it is reported as cut off (`bad_json`), not as missing.
+- **Objects at the edge are slid inside** the map rather than dropped
+  (`placeObjects`); only an object larger than the map is skipped.
+- **The engine recovers by itself** (`web/cartographe.js`): the download is
+  retried twice; an engine that stops mid-visit is restarted (at most twice,
+  never when it died while starting) and the request in flight, which races a
+  "stopped" signal so it cannot hang, is asked again; failure shows "Réessayer"
+  (a reload: the text is in `sessionStorage`); no WebAssembly gets its own
+  message. `e2e/engine.js` stages all of it with a stand-in engine.
+- **Deployments have a net.** The Website workflow publishes only if `go vet`,
+  `go test ./...`, the wasm tests and the browser checks (`e2e/`, ~180 checks,
+  under a minute) pass; after `wrangler deploy`, `scripts/check-site.sh`
+  compares the live site with the build byte for byte and the workflow runs
+  `wrangler rollback` if they differ. A manual run takes a `ref` to republish
+  an earlier commit. `docs/site-web.md` has the three ways back, in French.
+- **Go 1.26.11.** Go 1.24 was out of support (govulncheck: 15 standard-library
+  advisories). Keep the `go` directive on a supported release.
 
 ### Public website (Cloudflare Workers static assets)
 

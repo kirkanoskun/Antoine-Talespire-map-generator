@@ -97,6 +97,60 @@ glisser-déposer. Avec, chaque push sur `main` est publié tout seul.
    **deploy** doit finir en vert et met à jour le Worker `le-cartographe`. Le
    sous-domaine reste branché d'un déploiement à l'autre.
 
+## Filets de sécurité à chaque mise en ligne
+
+Chaque fusion dans `main` déclenche le workflow **Website**, qui ne publie que
+si tout passe :
+
+1. tous les tests du moteur (`go vet`, `go test ./...`) ;
+2. le moteur dans son vrai environnement (WebAssembly) ;
+3. le parcours complet du site dans un vrai navigateur, sur ordinateur et sur
+   téléphone (`e2e/`, environ 180 vérifications) ;
+4. la publication chez Cloudflare ;
+5. une vérification du site en ligne : `scripts/check-site.sh` compare, octet
+   pour octet, ce que sert `cartographe.antoinedebaets.com` avec ce qui vient
+   d'être construit (page, moteur, prompt).
+
+Si l'étape 5 échoue, le workflow remet automatiquement la version précédente
+(`wrangler rollback`) et reste rouge : le site continue de marcher, et l'échec
+se voit dans l'onglet **Actions**. Relancer le workflow (bouton **Re-run
+jobs**) suffit le plus souvent.
+
+L'adresse vérifiée vient de la variable de dépôt `SITE_URL` (par défaut
+`https://cartographe.antoinedebaets.com`) ; la valeur `none` désactive la
+vérification.
+
+## Revenir en arrière
+
+Trois façons, de la plus rapide à la plus propre. Aucune n'efface quoi que ce
+soit : on peut toujours republier la version récente ensuite.
+
+### A. Tout de suite, depuis Cloudflare (30 secondes)
+
+Tableau de bord Cloudflare → **Workers & Pages** → `le-cartographe` →
+**Deployments** → sur la ligne de la version voulue, **⋯** → **Rollback**.
+Le site revient à cette version immédiatement. À utiliser quand le site est
+cassé et qu'il faut le rétablir avant de comprendre pourquoi.
+
+Attention : la prochaine fusion dans `main` republiera la version récente.
+Annulez donc aussi le changement fautif (méthode C) avant de fusionner autre
+chose.
+
+### B. Republier une version précise depuis GitHub (5 minutes)
+
+Onglet **Actions** → **Website** → **Run workflow** → dans le champ
+« Version à publier », collez l'identifiant du commit voulu (visible dans
+l'historique du dépôt, par exemple `f5d1fc3`) → **Run workflow**. Le site est
+reconstruit et retesté à partir de ce commit, puis publié. Laisser le champ
+vide republie la dernière version.
+
+### C. Annuler le changement fautif (la méthode durable)
+
+Sur GitHub, ouvrez la pull request fusionnée qui a causé le problème →
+bouton **Revert** en bas de page → fusionnez la pull request d'annulation qui
+s'ouvre. Le code revient à l'état d'avant, tous les tests repassent, et le
+site est republié automatiquement.
+
 ## Tester localement
 
 ```sh
@@ -104,6 +158,14 @@ scripts/build-web.sh
 npx wrangler dev        # le vrai moteur de Cloudflare, sur http://localhost:8787
 # ou, sans Node :
 cd dist/web && python3 -m http.server 8000
+```
+
+Les vérifications dans le navigateur, celles que lance le workflow :
+
+```sh
+scripts/build-web.sh
+cd e2e && npm ci && npx playwright install chromium   # une seule fois
+node run.js             # tout ; ou : node run.js engine repairs
 ```
 
 Le site doit être servi en HTTP : ouvrir `index.html` directement depuis le
