@@ -27,12 +27,14 @@ The automated suite is green: `go vet`, `go test -race ./...`, the engine
 compiled to WebAssembly, and about 180 checks in a real browser (`e2e/`), all
 run before every deployment. What only a person can check:
 
-- [x] **In-game import, single slab.** A generated scene (a graveyard in a
-  swamp, with catalogue objects) was pasted into TaleSpire: terrain, objects
-  resting on the ground, lily pads on the water.
-- [ ] **In-game import, the rest.** A sliced map pasted piece by piece, and the
-  exact alignment of multi-tile objects (the village square's 2x2 fountain),
-  are still to be confirmed in game.
+- [x] **In-game import, single slab.** Two generated scenes (a graveyard in a
+  swamp, a paved village square) were pasted into TaleSpire: terrain, catalogue
+  objects on their tiles and resting on the ground, lily pads on the water.
+- [ ] **North and south are swapped in game.** Those two imports show the map
+  mirrored north-south compared with the preview (east and west are right).
+  Known, not fixed yet: see `docs/review-2026-11-14.md`.
+- [ ] **In-game import, sliced.** A large map pasted piece by piece is still to
+  be confirmed in game.
 - [ ] **Real Claude call.** The path that calls Claude directly with an API key
   (`/api/describe`, `/api/adjust`, `cmd/describe`, desktop app only) has never
   run against the live model, only a fake one. The website does not use it.
@@ -228,9 +230,8 @@ testdata/             example IR documents, reference scenes, descriptions
 
 ## License
 
-No licence has been chosen for this project's own code yet, which means all
-rights are reserved by default; see `docs/review-2026-11-14.md` for the
-options. What it builds on:
+This project's own code is under the [MIT License](./LICENSE). What it builds
+on keeps its own terms:
 
 - [taleslab](https://github.com/johnfercher/taleslab) and
   [talescoder](https://github.com/johnfercher/talescoder), MIT, used as Go
