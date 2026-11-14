@@ -22,3 +22,7 @@
 # Local library of community buildings (other players' work, each under its own
 # licence). Never commit it: the repository is public.
 /buildings/
+
+# Browser checks: screenshots and dependencies
+/e2e/shots/
+/e2e/node_modules/

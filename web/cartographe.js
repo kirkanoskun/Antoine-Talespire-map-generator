@@ -66,20 +66,99 @@
     return { status: 200, data: { prompt: head + scene } };
   }
 
+  // Loading can fail for reasons that pass (a dropped connection, a deploy
+  // in progress): try again a couple of times before giving up.
+  const RETRY_DELAYS_MS = [1500, 4000];
+  // An engine that stops mid-visit (out of memory, say) is started again, a
+  // bounded number of times so a crash on start-up cannot loop.
+  const MAX_RESTARTS = 2;
+  let restarts = 0;
+  // Rejected when the running engine stops, so a request it was serving does
+  // not wait for ever.
+  let stoppedSignal = null, signalStop = () => {};
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // boot loads and starts the engine; the promise settles when the engine has
+  // announced itself (__cartographeReady) or definitely could not start.
+  function boot() {
+    return new Promise((resolve, reject) => {
+      let settled = false, started = false;
+      const fail = (reason, msg) => {
+        if (settled) return;
+        settled = true; engineReady = false;
+        report('failed', { reason });
+        reject(new Error("le moteur de génération n'a pas pu se charger (" + msg + ')'));
+      };
+      window.__cartographeReady = () => {
+        stoppedSignal = new Promise((_, rej) => { signalStop = rej; });
+        stoppedSignal.catch(() => {});
+        settled = started = true; engineReady = true; report('ready'); resolve();
+      };
+      window.__cartographeFailed = (msg) => fail('error', msg);
+
+      (async () => {
+        if (typeof WebAssembly !== 'object' || typeof Go !== 'function') {
+          // Nothing a retry would change: the browser cannot run the engine,
+          // or its runtime file did not load.
+          return typeof WebAssembly !== 'object'
+            ? fail('unsupported', 'WebAssembly indisponible')
+            : fail('error', 'wasm_exec.js absent');
+        }
+        let lastError;
+        for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+          if (attempt > 0) {
+            await sleep(RETRY_DELAYS_MS[attempt - 1]);
+            engine.loaded = 0;
+            report('progress', { attempt: attempt + 1 });
+          }
+          try {
+            const go = new Go();
+            const result = await instantiate(go);
+            // run() only returns when the engine stops, which it should not.
+            Promise.resolve(go.run(result.instance)).catch(() => {}).then(stopped);
+            return;
+          } catch (err) {
+            lastError = err;
+          }
+        }
+        fail('error', lastError ? lastError.message : 'erreur inconnue');
+      })();
+
+      function stopped() {
+        if (!started) return fail('error', "le moteur s'est arrêté au démarrage");
+        // It was running: start a fresh one. The browser has the file cached.
+        engineReady = false;
+        const stop = signalStop;
+        if (restarts >= MAX_RESTARTS) {
+          report('failed', { reason: 'error' });
+        } else {
+          restarts++;
+          ready = boot();
+          ready.catch(() => {});
+        }
+        stop(new Error("le moteur de génération s'est arrêté"));
+      }
+    });
+  }
+
   // Start loading the engine immediately; requests wait for it.
-  const ready = new Promise((resolve, reject) => {
-    window.__cartographeReady = () => { engineReady = true; report('ready'); resolve(); };
-    window.__cartographeFailed = (msg) => { report('failed'); reject(new Error(msg)); };
-    const go = new Go();
-    instantiate(go).then((result) => go.run(result.instance))
-      .catch((err) => window.__cartographeFailed("le moteur de génération n'a pas pu se charger (" + err.message + ')'));
-  });
+  let ready = boot();
+  ready.catch(() => {});
 
   let lastPreview = null;
 
   async function goFetch(method, path, body) {
     await ready;
-    return window.cartographeFetch(method, path, body);
+    const running = ready;
+    try {
+      return await Promise.race([window.cartographeFetch(method, path, body), stoppedSignal]);
+    } catch (err) {
+      // If the engine died under this request and a new one was started, wait
+      // for it and ask once more; any other failure is reported as it is.
+      if (ready === running) throw err;
+      await ready;
+      return Promise.race([window.cartographeFetch(method, path, body), stoppedSignal]);
+    }
   }
 
   window.fetch = async (input, init = {}) => {

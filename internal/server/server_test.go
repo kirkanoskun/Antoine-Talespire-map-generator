@@ -250,3 +250,32 @@ func TestAdjustUnknownSession(t *testing.T) {
 		t.Fatalf("expected 404 for unknown session, got %d", rec.Code)
 	}
 }
+
+// A reply with benign slips (French biome, decimal coordinate, extra field, a
+// relief the biome lacks, a building nobody imported, a trailing comma) is
+// drawn anyway, and the response says what was corrected.
+func TestSloppyReplyIsRepairedAndReported(t *testing.T) {
+	h := newServer(t, nil)
+	reply := "Voici la carte !\n```json\n" + `{"map":{"width":40,"length":40,"biome":"Forêt tempérée"},
+		"zones":[{"id":"cour","anchor":{"x":20.4,"y":40},"relative_size":60,"elevation":"Plat","relief_override":"lava_lake","mood":"calme",},],
+		"buildings":[{"prefab":"taverne","position":{"x":3,"y":3}}]}` + "\n```\nBonne partie {à vous} !"
+	body, _ := json.Marshal(map[string]string{"text": reply})
+	rec, out := post(t, h, "/api/generate", string(body))
+	if rec.Code != 200 || out["code"] == "" {
+		t.Fatalf("status %d: %v", rec.Code, out["error"])
+	}
+	got := map[string]bool{}
+	for _, r := range out["repairs"].([]any) {
+		got[r.(map[string]any)["code"].(string)] = true
+	}
+	for _, want := range []string{"syntax_cleaned", "biome", "number_rounded", "anchor", "zone_size", "elevation", "unknown_field", "relief_dropped", "building_dropped"} {
+		if !got[want] {
+			t.Errorf("repair %q not reported; got %v", want, got)
+		}
+	}
+	// A clean reply reports nothing.
+	body, _ = json.Marshal(map[string]string{"text": cannedIR})
+	if _, out := post(t, h, "/api/generate", string(body)); out["repairs"] != nil {
+		t.Errorf("a valid map reported repairs: %v", out["repairs"])
+	}
+}

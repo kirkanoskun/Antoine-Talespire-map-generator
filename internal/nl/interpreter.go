@@ -196,25 +196,68 @@ func (in *Interpreter) validate(raw string, opts Options) (*ir.IR, error) {
 // ExtractJSON pulls the JSON object out of a model response, tolerating stray
 // prose or ```json fences even though the prompt forbids them. The server uses
 // it too, so a reply pasted by hand is read the same way.
+//
+// When the reply holds several complete objects (a first draft then a
+// corrected map, or a stray "{note}" in the prose after it), the last one that
+// looks like a map wins. Otherwise it falls back to everything between the
+// first "{" and the last "}", which for a truncated reply is the truncated map:
+// the caller then reports it as cut off rather than as missing.
 func ExtractJSON(raw string) string {
 	s := strings.TrimSpace(raw)
-	// Strip a leading ```json / ``` fence and its closing counterpart.
-	if strings.HasPrefix(s, "```") {
-		if nl := strings.IndexByte(s, '\n'); nl != -1 {
-			s = s[nl+1:]
+	best := ""
+	for _, candidate := range balancedObjects(s) {
+		if strings.Contains(candidate, `"zones"`) || strings.Contains(candidate, `"map"`) {
+			best = candidate
 		}
-		if end := strings.LastIndex(s, "```"); end != -1 {
-			s = s[:end]
-		}
-		s = strings.TrimSpace(s)
 	}
-	// Fall back to the outermost {...} span.
+	if best != "" {
+		return best
+	}
 	start := strings.IndexByte(s, '{')
 	end := strings.LastIndexByte(s, '}')
 	if start == -1 || end == -1 || end < start {
 		return ""
 	}
 	return s[start : end+1]
+}
+
+// balancedObjects returns the top-level {...} spans of s whose braces balance,
+// ignoring braces inside JSON strings.
+func balancedObjects(s string) []string {
+	var out []string
+	depth, start := 0, -1
+	inString, escaped := false, false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inString {
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"', c == '\n' && depth == 0:
+				inString = false // prose quotes do not span lines
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+				if depth == 0 {
+					out = append(out, s[start:i+1])
+				}
+			}
+		}
+	}
+	return out
 }
 
 func errString(err error) string {

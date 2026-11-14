@@ -198,10 +198,22 @@ func TestScatteredCatalogueObjects(t *testing.T) {
 	}
 }
 
-func TestCatalogueObjectOutsideTheMapIsSkipped(t *testing.T) {
+// An object whose footprint would cross the east or south edge is slid back
+// inside the map; one larger than the map itself is skipped.
+func TestCatalogueObjectAtTheEdgeIsSlidInside(t *testing.T) {
 	res := generate(t, square(t, `{"prop":"wagon_01","position":{"x":39,"y":38}}`))
-	if len(res.Height.Objects()) != 0 || !strings.Contains(strings.Join(res.Warnings, "\n"), "outside the map") {
-		t.Errorf("objects %v, warnings %v", res.Height.Objects(), res.Warnings)
+	objs := res.Height.Objects()
+	if len(objs) != 1 || objs[0].X != 38 || objs[0].Y != 35 || !strings.Contains(strings.Join(res.Warnings, "\n"), "moved from (39,38) to (38,35)") {
+		t.Errorf("objects %v, warnings %v", objs, res.Warnings)
+	}
+	doc, err := ir.Parse([]byte(`{"map":{"width":2,"length":2,"biome":"temperate_forest"},"zones":[{"id":"a","anchor":{"x":0,"y":0},"relative_size":1,
+		"points_of_interest":[{"prop":"wagon_01","position":{"x":0,"y":0}}]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	small := generate(t, doc)
+	if len(small.Height.Objects()) != 0 || !strings.Contains(strings.Join(small.Warnings, "\n"), "outside the map") {
+		t.Errorf("objects %v, warnings %v", small.Height.Objects(), small.Warnings)
 	}
 }
 

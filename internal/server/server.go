@@ -187,6 +187,8 @@ type genResponse struct {
 	// UnknownProps are point-of-interest names that exist nowhere, once each:
 	// the UI asks the visitor's AI to replace them.
 	UnknownProps []string `json:"unknown_props,omitempty"`
+	// Repairs are the benign slips corrected in the AI's map before drawing it.
+	Repairs []ir.Repair `json:"repairs,omitempty"`
 	// POILabels names, in French, the scene-theme objects the map uses, so the
 	// zone list says "fontaine" rather than a catalogue slug.
 	POILabels  map[string]string     `json:"poi_labels,omitempty"`
@@ -330,7 +332,9 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		}
 		raw = json.RawMessage(extracted)
 	}
-	doc, err := ir.Parse(raw)
+	// A map written by an assistant is read leniently: benign slips are
+	// repaired and reported rather than sent back to the AI.
+	doc, repairs, err := ir.ParseLenient(raw, s.gen.Lenient())
 	if err != nil {
 		kind := errBadMap
 		var syntax *json.SyntaxError
@@ -340,7 +344,7 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		writeErrorKind(w, http.StatusBadRequest, kind, err.Error())
 		return
 	}
-	s.finish(w, req.Session, doc, 0)
+	s.finish(w, req.Session, doc, 0, repairs...)
 }
 
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
@@ -363,7 +367,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 // finish generates the map for doc, stores it under the session (creating one if
 // id is empty), and writes the JSON response.
-func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts int) {
+func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts int, repairs ...ir.Repair) {
 	if doc == nil {
 		writeError(w, http.StatusInternalServerError, "no IR produced")
 		return
@@ -420,6 +424,7 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 		SliceSize:    res.SliceSize,
 		Warnings:     res.Warnings,
 		UnknownProps: res.UnknownProps,
+		Repairs:      repairs,
 		POILabels:    poiLabels(doc),
 		Attempts:     attempts,
 		PreviewURL:   fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),
