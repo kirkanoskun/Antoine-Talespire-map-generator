@@ -412,13 +412,16 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   pebbles, round cacti, snow boulders, lava spikes and a hell tree, horsetails.
   Weights are unchanged, so density and the preview stay the same; only which
   prop is drawn changes (the golden changed, the sample map did not). The swamp
-  no longer borrows pines: it grows `swamp_tree` (trunk + canopy stacked at
-  step 1 and 9) and `swamp_tree_trunk`. `jungle_tree_tall` stacks the same way
-  (steps 1 and 5); `TestStackedTreesRestOnTheirTrunk` holds a canopy on its
-  trunk's height. New ids never reuse a catalogue slug, so a point of interest
-  naming a catalogue object keeps its exact placement. Every `ground` relief
-  offers at least ten props (`TestBiomesScatterAVariedCatalogue`). In-game
-  validation of the stacked trees pending.
+  no longer borrows pines: it grows `swamp_tree` (root base, crown of branches
+  and tip, stacked at steps 1, 9 and 13), `swamp_tree_bare` (base and tip) and
+  `swamp_tree_trunk`. `jungle_tree_tall` stacks a base and a canopy (steps 1
+  and 5). Each piece rests on the one below (offset = previous offset + its
+  height in steps, `TestStackedTreesRestOnTheirTrunk`); validated in game for
+  the jungle tree and the bare swamp tree, the three-piece swamp tree is
+  pending. New ids never reuse a catalogue slug, so a point of interest naming
+  a catalogue object keeps its exact placement. Every `ground` relief offers
+  at least ten props (`TestBiomesScatterAVariedCatalogue`). In game (15 Nov)
+  the forest, swamp and jungle maps showed every new prop seated on the ground.
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.

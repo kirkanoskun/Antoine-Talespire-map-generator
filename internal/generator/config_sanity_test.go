@@ -288,7 +288,8 @@ func TestSwampGrowsSwampTrees(t *testing.T) {
 
 // A tree built from stacked pieces puts each piece on top of the one below:
 // its offset (in half-tile steps) is the previous one's plus that piece's
-// height, so the canopy neither floats nor sinks into the trunk.
+// height, so a crown neither floats nor sinks into the trunk. The swamp tree
+// and the tall jungle tree were checked this way in game.
 func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
 	var props []struct {
 		ID    string `json:"id"`
@@ -302,20 +303,29 @@ func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	stacked := map[string]int{"swamp_tree": 3, "swamp_tree_bare": 2, "jungle_tree_tall": 2}
 	for _, p := range props {
-		if p.ID != "swamp_tree" && p.ID != "jungle_tree_tall" {
+		want, ok := stacked[p.ID]
+		if !ok {
 			continue
 		}
-		if len(p.Parts) != 2 {
-			t.Fatalf("%s has %d pieces, want a trunk and a canopy", p.ID, len(p.Parts))
+		delete(stacked, p.ID)
+		if len(p.Parts) != want {
+			t.Errorf("%s has %d pieces, want %d", p.ID, len(p.Parts), want)
+			continue
 		}
-		trunk, ok := cat.ByID(p.Parts[0].ID)
-		if !ok {
-			t.Fatalf("%s: trunk %s not in the catalogue", p.ID, p.Parts[0].ID)
+		for i := 1; i < len(p.Parts); i++ {
+			below, ok := cat.ByID(p.Parts[i-1].ID)
+			if !ok {
+				t.Fatalf("%s: piece %s not in the catalogue", p.ID, p.Parts[i-1].ID)
+			}
+			step := p.Parts[i-1].OffsetZ + int(math.Round(below.Size[2]*2))
+			if got := p.Parts[i].OffsetZ; got != step {
+				t.Errorf("%s: piece %d at step %d, want %d (on top of %s, %.2f tiles tall)", p.ID, i, got, step, below.Slug, below.Size[2])
+			}
 		}
-		want := p.Parts[0].OffsetZ + int(math.Round(trunk.Size[2]*2))
-		if got := p.Parts[1].OffsetZ; got != want {
-			t.Errorf("%s: canopy at step %d, want %d (on top of a %.2f-tile trunk)", p.ID, got, want, trunk.Size[2])
-		}
+	}
+	for id := range stacked {
+		t.Errorf("props.json has no %s", id)
 	}
 }

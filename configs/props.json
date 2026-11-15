@@ -1198,6 +1198,41 @@
         "offset_z": 1
       },
       {
+        "id": "AAAJwulTUPqKQI+jDJu52wu3",
+        "name": "swamp_tree_mid_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 9
+      },
+      {
+        "id": "AABl4KLv73ccSrQ79D8bnq9m",
+        "name": "swamp_tree_top",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 13
+      }
+    ]
+  },
+  {
+    "id": "swamp_tree_bare",
+    "asset_parts": [
+      {
+        "id": "AAA7zeO9XtZwSLOCZoxCLieD",
+        "name": "swamp_tree_base_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      },
+      {
         "id": "AABl4KLv73ccSrQ79D8bnq9m",
         "name": "swamp_tree_top",
         "dimensions": {

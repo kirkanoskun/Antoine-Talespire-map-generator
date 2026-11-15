@@ -1202,6 +1202,7 @@
       "weight": 0.2,
       "props": [
        "swamp_tree",
+       "swamp_tree_bare",
        "swamp_tree_trunk",
        "dead_tree_tiny",
        "bush_tree"
@@ -1246,6 +1247,7 @@
       "weight": 0.1,
       "props": [
        "swamp_tree",
+       "swamp_tree_bare",
        "swamp_tree_trunk",
        "dead_tree_tiny",
        "bush_tree"
@@ -1291,6 +1293,7 @@
       "weight": 0.2,
       "props": [
        "swamp_tree",
+       "swamp_tree_bare",
        "swamp_tree_trunk",
        "dead_tree_tiny"
       ]
@@ -1332,6 +1335,7 @@
       "weight": 0.05,
       "props": [
        "swamp_tree",
+       "swamp_tree_bare",
        "swamp_tree_trunk"
       ]
      },
