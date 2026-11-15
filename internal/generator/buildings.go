@@ -25,6 +25,7 @@ type placedBuilding struct {
 	b        *prefab.Building
 	x0, y0   int
 	rotation int
+	length   int // footprint extent along y, once rotated
 	height   int // levelled terrain height under the footprint
 }
 
@@ -94,7 +95,7 @@ func (g *Generator) placeBuildings(doc *ir.IR, f *HeightField) ([]placement, err
 		if need := b.Info.GroundY - surface(height); need > lift {
 			lift = need
 		}
-		planned = append(planned, placedBuilding{b: b, x0: x0, y0: y0, rotation: placementIR.Rotation, height: height})
+		planned = append(planned, placedBuilding{b: b, x0: x0, y0: y0, rotation: placementIR.Rotation, length: l, height: height})
 	}
 
 	// Raise the whole scene (terrain, scatter, POIs, every building) by whole
@@ -130,6 +131,10 @@ func (g *Generator) placeBuildings(doc *ir.IR, f *HeightField) ([]placement, err
 					return nil, fmt.Errorf("invalid building rotation")
 				}
 				p.Rotation = (p.Rotation + uint8(pb.rotation/15)) % 24
+				// The map is mirrored north-south on the way out (encodeRegion),
+				// but a building is not: it keeps its own layout, one tile in
+				// from the edge of its mirrored footprint nearest the origin.
+				mirror := (pb.length-2)*100 - 2*p.Z
 				p.X += (pb.x0 + 1) * 100
 				p.Z += (pb.y0 + 1) * 100
 				buried := p.Y < b.Info.GroundY
@@ -147,7 +152,7 @@ func (g *Generator) placeBuildings(doc *ir.IR, f *HeightField) ([]placement, err
 				one := &slab.Layout{ID: layout.ID, Reserved: layout.Reserved, Instances: []slab.Instance{p}}
 				// Bucket the entire prefab by its anchor so slicing never cuts a building
 				// apart. A building can extend beyond that slice's nominal tile rectangle.
-				out = append(out, placement{tileX: pb.x0, tileY: pb.y0, imported: one})
+				out = append(out, placement{tileX: pb.x0, tileY: pb.y0 + pb.length - 1, imported: one, mirror: mirror})
 			}
 		}
 	}

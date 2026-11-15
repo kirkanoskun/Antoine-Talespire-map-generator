@@ -30,9 +30,9 @@ run before every deployment. What only a person can check:
 - [x] **In-game import, single slab.** Two generated scenes (a graveyard in a
   swamp, a paved village square) were pasted into TaleSpire: terrain, catalogue
   objects on their tiles and resting on the ground, lily pads on the water.
-- [ ] **North and south are swapped in game.** Those two imports show the map
-  mirrored north-south compared with the preview (east and west are right).
-  Known, not fixed yet: see `docs/review-2026-11-14.md`.
+- [ ] **North is north.** Those two imports showed the map mirrored
+  north-south compared with the preview. Fixed since (positions are flipped
+  when encoding); to be confirmed in game.
 - [ ] **In-game import, sliced.** A large map pasted piece by piece is still to
   be confirmed in game.
 - [ ] **Real Claude call.** The path that calls Claude directly with an API key

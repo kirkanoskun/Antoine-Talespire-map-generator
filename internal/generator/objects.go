@@ -209,7 +209,13 @@ func (f *HeightField) seatObject(a *catalogs.Asset, x, y int) (placement, error)
 	if inst.X > slab.MaxCoordinate || inst.Y > slab.MaxCoordinate || inst.Z > slab.MaxCoordinate {
 		return placement{}, fmt.Errorf("object %q exceeds Slab coordinate limits", a.Slug)
 	}
-	return placement{tileX: x, tileY: y, imported: &slab.Layout{ID: id, Instances: []slab.Instance{inst}}}, nil
+	// Bucketed by its south-west tile: once mirrored (encodeRegion), that is the
+	// corner nearest the slab's origin, so a slice never gets a negative position.
+	return placement{
+		tileX: x, tileY: y + d - 1,
+		imported: &slab.Layout{ID: id, Instances: []slab.Instance{inst}},
+		mirror:   int(math.Round(2 * a.Center[1] * 100)),
+	}, nil
 }
 
 // Lenient returns what ir.ParseLenient needs from this generator's catalogues

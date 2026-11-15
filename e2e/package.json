@@ -3,5 +3,5 @@
   "private": true,
   "description": "Browser checks for the built website (see run.js).",
   "scripts": { "test": "node run.js" },
-  "devDependencies": { "playwright": "1.56.1" }
+  "devDependencies": { "playwright": "1.64.1" }
 }

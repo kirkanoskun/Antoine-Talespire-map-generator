@@ -62,7 +62,12 @@ func TestBuildingPrecisionRotationAndSlicing(t *testing.T) {
 			}
 			got := importedInstances(t, res.Code)
 			pairs := map[int][][2]int{0: {{0, 0}, {125, 125}}, 90: {{0, 125}, {125, 0}}, 180: {{125, 125}, {0, 0}}, 270: {{125, 0}, {0, 125}}}[angle]
-			want := []slab.Instance{{X: 900 + pairs[0][0], Y: 100, Z: 800 + pairs[0][1], Rotation: uint8((3 + angle/15) % 24), Extra: 17}, {X: 900 + pairs[1][0], Y: 225, Z: 800 + pairs[1][1], Rotation: uint8((19 + angle/15) % 24), Extra: 5}}
+			// The map is mirrored north-south on the way out, the building is
+			// not: its 6x4 footprint at rows 7..10 (4x6, rows 7..12, when turned)
+			// lands on mirrored rows 9..12 (7..12), and the building sits one
+			// tile in from the low edge, as in its own Slab.
+			z0 := map[int]int{0: 1000, 90: 800, 180: 1000, 270: 800}[angle]
+			want := []slab.Instance{{X: 900 + pairs[0][0], Y: 100, Z: z0 + pairs[0][1], Rotation: uint8((3 + angle/15) % 24), Extra: 17}, {X: 900 + pairs[1][0], Y: 225, Z: z0 + pairs[1][1], Rotation: uint8((19 + angle/15) % 24), Extra: 5}}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("angle %d: got %+v, want %+v", angle, got, want)
 			}
@@ -87,7 +92,7 @@ func TestBuildingPrecisionRotationAndSlicing(t *testing.T) {
 					count += len(parts)
 					for i := range parts {
 						parts[i].X += x * 500
-						parts[i].Z += y * 500
+						parts[i].Z += (len(sliced.Slices[x]) - 1 - y) * 500 // slices run north to south
 					}
 					if len(parts) > 0 && !reflect.DeepEqual(parts, want) {
 						t.Fatal("slicing lost or transformed building parts")
@@ -226,7 +231,7 @@ func TestBuildingSeatsOnItsGroundLevel(t *testing.T) {
 			t.Errorf("tile %v under the cellar was not dug", tile)
 		}
 		for _, p := range terrain {
-			if p.X == tile[0]*100 && p.Z == tile[1]*100 {
+			if p.X == tile[0]*100 && p.Z == (19-tile[1])*100 { // row y is mirrored to 19-y
 				t.Fatalf("terrain still fills the cellar at tile %v (Y=%d)", tile, p.Y)
 			}
 		}
@@ -236,7 +241,7 @@ func TestBuildingSeatsOnItsGroundLevel(t *testing.T) {
 	}
 	groundAt66 := false
 	for _, p := range terrain {
-		if p.X == 600 && p.Z == 600 {
+		if p.X == 600 && p.Z == (19-6)*100 {
 			groundAt66 = true
 		}
 	}

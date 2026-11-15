@@ -448,13 +448,21 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   an earlier commit. `docs/site-web.md` has the three ways back, in French.
 - **Go 1.26.11.** Go 1.24 was out of support (govulncheck: 15 standard-library
   advisories). Keep the `go` directive on a supported release.
-- **Known defect: the game shows the preview mirrored north-south.** Two
-  in-game imports (the graveyard and the village square reference scenes)
-  place what the preview draws at the north in the south, east and west being
-  right: the map's y axis grows the opposite way to the game's Z. Objects are
-  otherwise seated and aligned as intended (RG4 holds). The fix is to flip y
-  when encoding (terrain, objects, building footprints, slice-local origins),
-  which changes every code and the golden, and needs an in-game re-check.
+- **North is north: positions are mirrored on the way out.** The map's y grows
+  to the south, the game's Z to the north; two in-game imports showed the map
+  mirrored north-south against the preview (objects otherwise seated and
+  aligned as intended: RG4 holds). Everything upstream stays in map space (y
+  down, like the preview); `encodeRegion` flips each position about the middle
+  of its region, the whole map or one slice. An asset is flipped as a whole,
+  not mirrored itself, so its row depends on where its origin sits: a tile's is
+  its corner (row y -> length-1-y), a prop's its centre (point y -> length-y),
+  read from the catalogue (`mirrorShift`); an exact object uses twice its
+  centre offset, and a building keeps its own layout one tile in from the low
+  edge of its mirrored footprint. Objects and buildings are bucketed for
+  slicing by their south-west tile, so a slice never gets a negative position.
+  The golden was regenerated and checked to be the exact mirror of the old one;
+  `TestNorthOfTheMapIsNorthInTheGame` and
+  `TestSlicesReassembleIntoTheWholeMap` hold the rule. In-game re-check pending.
 
 ### Public website (Cloudflare Workers static assets)
 
