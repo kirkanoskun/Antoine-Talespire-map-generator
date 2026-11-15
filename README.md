@@ -1,61 +1,66 @@
-# Antoine-Talespire-map-generator
+# Le Cartographe — a TaleSpire map generator
 
-Generate coherent [TaleSpire](https://talespire.com/) maps from a natural-language
-description, with a 2D visual round-trip before exporting into the game.
+Describe a scene in plain French and get a coherent [TaleSpire](https://talespire.com/)
+map: a 2D preview first, then the code to paste into the game.
+
+**Try it: <https://cartographe.antoinedebaets.com>** — it runs entirely in your
+browser, with the AI assistant of your choice (ChatGPT, Claude, Gemini…): the
+site prepares a prompt, you paste the assistant's answer back, and the map is
+drawn. No account, no key, nothing collected.
 
 Built on top of [johnfercher/taleslab](https://github.com/johnfercher/taleslab)
 (imported as a Go module), this project adds what taleslab lacks: **semantic
 zones that modulate relief and density within a single, coherent biome**,
-**precise placement of points of interest**, and (in later phases) a
-natural-language layer and web UI. See [CLAUDE.md](./CLAUDE.md) for the full
-design and roadmap.
+**precise placement of points of interest** from TaleSpire's full catalogue, a
+natural-language layer and a web UI. See [CLAUDE.md](./CLAUDE.md) for the design
+and the decisions taken so far.
 
 A map has **one dominant biome**, fixed for the whole map. Zones never change the
 biome — they only modulate, within it, the prop density, the relief used (via
 `relief_override`), and the explicit points of interest. Needs the biome does not
-cover yet (e.g. ruins) are added as a new relief to that biome in
+cover yet (e.g. ruins, paving) are added as a new relief to that biome in
 `configs/biomes.json`, never by borrowing a different biome.
 
-## ⚠️ Validation status: complete but not validated end-to-end
+## Validation status
 
-All five phases are implemented and the **offline** test suite is green
-(`go test ./...`, `go vet`, `gofmt`). Two things have **not** been exercised yet
-and are the acceptance TODO before calling this "verified":
+The automated suite is green: `go vet`, `go test -race ./...`, the engine
+compiled to WebAssembly, and about 180 checks in a real browser (`e2e/`), all
+run before every deployment. What only a person can check:
 
-- [ ] **Real Claude call.** The natural-language layer (`/api/describe`,
-  `/api/adjust`, `cmd/describe`) has never run against the live model — only a
-  fake completer. Run `ANTHROPIC_API_KEY=... go run ./cmd/server` (or
-  `go test ./internal/nl/` with a key for the ~10-description eval) and confirm
-  it produces valid IR.
-- [ ] **In-game import.** No generated code has been pasted into an actual
-  TaleSpire client. Export a map and verify it imports and looks right
-  (including a sliced large map pasting adjacent).
+- [x] **In-game import, single slab.** Two generated scenes (a graveyard in a
+  swamp, a paved village square) were pasted into TaleSpire: terrain, catalogue
+  objects on their tiles and resting on the ground, lily pads on the water.
+- [ ] **North is north.** Those two imports showed the map mirrored
+  north-south compared with the preview. Fixed since (positions are flipped
+  when encoding); to be confirmed in game.
+- [ ] **In-game import, sliced.** A large map pasted piece by piece is still to
+  be confirmed in game.
+- [ ] **Real Claude call.** The path that calls Claude directly with an API key
+  (`/api/describe`, `/api/adjust`, `cmd/describe`, desktop app only) has never
+  run against the live model, only a fake one. The website does not use it.
 
-Everything automatable — encoding, `talescoder` decode round-trip, the ~30 kB
-slab limit, determinism, the spatial algorithms, the HTTP API — is covered by
-tests. The two boxes above need a key and the game, so they're manual.
-
-## Status: Phases 1–5 — natural language to map, web UI, export
-
-Describe a scene in French; the engine turns it into a level-design
-**intermediate representation (IR)**, resolves the IR into a TaleSpire slab
-(each zone in the map's single biome with its own relief/densities), renders a
-preview, and lets you adjust it conversationally in the browser:
+## How it works
 
 ```
-description  ->  Claude (validate + retry)  ->  IR (JSON)
+description  ->  prompt for your AI assistant  ->  its reply, pasted back
+reply        ->  lenient reader (repairs benign slips)  ->  IR (JSON)
 IR (JSON)    ->  weighted-Voronoi zone mask ->  border stitching  ->  slab  ->  base64 code
                                             \->  2D top-down PNG preview
-adjustment   ->  Claude edits the in-memory IR  ->  re-render
+retouch      ->  a request carrying the current IR, for the assistant  ->  new reply
 ```
 
-The spatial layer is complete: adjacent zones are **stitched** (height and prop
-density smoothed across a band at each border; the material relief stays crisp),
-a small zone sharing a larger zone's anchor is **nested** as a disc (a pond at
-the courtyard centre), and **connections** are carved into bare corridors that
-ramp between zones. For export, large maps are **sliced** into a grid of slabs,
-each under TaleSpire's ~30 kB limit (`-slice`); the only remaining step is
-pasting the code(s) into an actual TaleSpire client.
+Adjacent zones are **stitched** (height and prop density smoothed across a band
+at each border; the material relief stays crisp), a small zone sharing a larger
+zone's anchor is **nested** as a disc (a pond at the courtyard centre), and
+**connections** are carved into bare corridors that ramp between zones. Points
+of interest can name any of TaleSpire's ~2,900 tiles and props; the prompt
+offers curated **scene themes** (graveyard, village square, swamp, abandoned
+village). Large maps are **sliced** automatically into slabs under TaleSpire's
+~30 kB limit.
+
+The reader is forgiving on purpose: an assistant's reply with a decimal
+coordinate, an extra field, a French keyword or an unknown terrain is repaired
+and drawn, and the page lists what was corrected (`ir.ParseLenient`).
 
 ## Desktop app (no terminal)
 
@@ -95,8 +100,8 @@ guide, in French: [`docs/site-web.md`](docs/site-web.md).
 ## Quick start (from source)
 
 ```bash
-# Web UI: describe, preview, adjust, export. The description/adjust features need
-# ANTHROPIC_API_KEY (the "apply edited IR" path works offline). The key can be
+# Web UI: describe, copy the prompt, paste the reply, preview, export. Works
+# without a key; with ANTHROPIC_API_KEY it can also call Claude directly. The key can be
 # exported, or dropped in a .env file (auto-loaded — see .env.example); an
 # exported variable wins over .env.
 go run ./cmd/server        # opens http://127.0.0.1:8080 in your browser
@@ -202,21 +207,41 @@ with a pond and northern ruins).
 
 ```
 cmd/generate/         CLI: IR -> map
-cmd/describe/         CLI: description -> IR -> map
-cmd/server/           HTTP server for the web UI
-internal/ir/          IR types, strict parsing & validation
+cmd/describe/         CLI: description -> IR -> map (needs an Anthropic key)
+cmd/server/           the desktop app: HTTP server + web UI
+cmd/web/              the same app compiled to WebAssembly, for the website
+cmd/import-index/     TaleSpire's pack indexes -> configs/assets.json
+cmd/import-slab/      a community building's code -> configs/prefabs.json
+web/                  the website's bridge between the page and the engine
+e2e/                  browser checks on the built website
+internal/ir/          IR types, strict and lenient parsing, validation
 internal/spatial/     zone mask (Voronoi + nesting), transitions, path carving
-internal/generator/   zone-aware slab generation, stitching, paths, encoding
+internal/generator/   zone-aware slab generation, stitching, paths, objects
 internal/preview/     top-down 2D PNG renderer
-internal/nl/          natural language -> IR (Claude call, validate + retry, adjust)
-internal/server/      HTTP API + embedded single-page UI, in-memory sessions
-configs/              biome & prop catalogues (from taleslab)
-testdata/             example IR documents + NL descriptions
+internal/nl/          prompt, catalogue, Claude call, validate + retry
+internal/server/      HTTP API + embedded single-page UI
+internal/catalogs/    catalogues parsed from memory; full catalogue and themes
+internal/slab/        TaleSpire's slab binary format
+internal/prefab/      imported buildings and their licences
+configs/              biomes, props, the full catalogue, scene themes
+docs/                 website setup and rollback, specs, reviews
+testdata/             example IR documents, reference scenes, descriptions
 ```
 
 ## License
 
-Inherits the terms of the upstream taleslab project for reused assets/config.
+This project's own code is under the [MIT License](./LICENSE). What it builds
+on keeps its own terms:
+
+- [taleslab](https://github.com/johnfercher/taleslab) and
+  [talescoder](https://github.com/johnfercher/talescoder), MIT, used as Go
+  modules; `configs/biomes.json` and `configs/props.json` started as copies of
+  taleslab's.
+- `configs/taleweaver/` and `configs/assets.json` are TaleSpire's own asset
+  indexes (names, identifiers, sizes; no artwork), © Bouncyrock Entertainment,
+  included to make the generator usable and removed on request.
+- The fonts in `internal/server/static/fonts/` are under the SIL Open Font
+  License (texts alongside).
 
 ### Bâtiments importés (Slabs v2)
 

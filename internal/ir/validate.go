@@ -2,6 +2,8 @@ package ir
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/johnfercher/taleslab/pkg/taleslab/taleslabdomain/taleslabconsts/biometype"
 )
@@ -44,7 +46,7 @@ func (doc *IR) Validate() error {
 		return fmt.Errorf("map dimensions %dx%d exceed maximum %d", doc.Map.Width, doc.Map.Length, MaxDimension)
 	}
 	if !KnownBiomes[doc.Map.Biome] {
-		return fmt.Errorf("map: unknown biome %q", doc.Map.Biome)
+		return fmt.Errorf("map: unknown biome %q (valid: %s)", doc.Map.Biome, strings.Join(biomeList(), ", "))
 	}
 	if len(doc.Zones) == 0 {
 		return fmt.Errorf("at least one zone is required")
@@ -130,4 +132,14 @@ func (doc *IR) Validate() error {
 
 func (doc *IR) inBounds(x, y int) bool {
 	return x >= 0 && x < doc.Map.Width && y >= 0 && y < doc.Map.Length
+}
+
+// biomeList returns the known biomes, sorted, for error messages.
+func biomeList() []string {
+	list := make([]string, 0, len(KnownBiomes))
+	for b := range KnownBiomes {
+		list = append(list, b)
+	}
+	sort.Strings(list)
+	return list
 }

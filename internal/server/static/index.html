@@ -175,6 +175,9 @@
   .export .err{margin:0 0 14px}
   .zones small{display:block; color:var(--muted); font-size:13px}
   .warnings{margin:24px 0 0; padding-left:20px; color:var(--muted); font-size:14px}
+  .repairs{margin:24px 0 0; font-size:14px; color:var(--muted); max-width:70ch}
+  .repairs ul{margin:8px 0 0; padding-left:20px}
+  .repairs li{margin-bottom:4px}
   .export h3{font-size:15px}
   .placing{margin:10px 0 0; padding-left:20px; font-size:14px; color:var(--muted)}
   .placing li{margin-bottom:4px}
@@ -292,7 +295,7 @@
         <button class="primary large" id="genPrompt">Préparer le prompt →</button>
         <span class="kbd-hint">ou Ctrl + Entrée</span>
       </div>
-      <p class="engine" id="engineStatus" role="status" hidden><span id="engineText">Chargement du moteur de génération…</span><progress id="engineBar" max="1" value="0"></progress></p>
+      <p class="engine" id="engineStatus" role="status" hidden><span id="engineText">Chargement du moteur de génération…</span><progress id="engineBar" max="1" value="0"></progress><button class="link" id="engineRetry" hidden>Réessayer</button></p>
       <p class="note"><button class="link" id="pasteDirect">Vous avez déjà la réponse de l’IA ? Collez-la directement</button></p>
       </div>
 
@@ -445,6 +448,10 @@
         </div>
       </div>
     </div>
+    <details class="repairs" id="repairsWrap" hidden>
+      <summary id="repairsSummary"></summary>
+      <ul id="repairsList"></ul>
+    </details>
     <div id="warningsWrap" hidden>
       <ul class="warnings" id="mapWarnings"></ul>
       <div class="unknown-fix" id="unknownFix" hidden>
@@ -750,9 +757,50 @@ function frenchWarning(w){
   if (m) return `« ${poiName(m[2])} » chevauche un autre objet dans la zone « ${m[1]} » : il est ignoré.`;
   m = w.match(/^zone "(.+)": POI "(.+)" needs (\d+)x(\d+) tiles at \((\d+),(\d+)\), outside the map/);
   if (m) return `« ${poiName(m[2])} » (${m[3]} × ${m[4]} cases) dépasse du bord de la carte en (${m[5]}, ${m[6]}) : il est ignoré.`;
+  m = w.match(/^zone "(.+)": POI "(.+)" moved from \((\d+),(\d+)\) to \((\d+),(\d+)\) to fit in the map/);
+  if (m) return `« ${poiName(m[2])} » dépassait du bord de la carte : il est décalé en (${m[5]}, ${m[6]}).`;
   m = w.match(/^zone "(.+)": only (\d+) of (\d+) "(.+)" fit/);
   if (m) return `Seuls ${m[2]} « ${poiName(m[4])} » sur ${m[3]} tiennent dans la zone « ${m[1]} ».`;
   return w;
+}
+// What the engine repaired in the AI's map (ir.Repair), in the GM's words.
+const REPAIR_LOSSES = ['relief_dropped', 'building_dropped', 'connection_dropped', 'poi_dropped'];
+const ELEVATIONS = {flat: 'terrain plat', hill: 'colline', mountain: 'montagne', depression: 'creux'};
+function frenchRepair(r, zones){
+  const z = zones.find((x) => x.id === r.zone);
+  const zone = r.zone ? `« ${(z && z.description) || r.zone} »` : '';
+  const inZone = zone ? ` (zone ${zone})` : '';
+  const side = r.field === 'width' ? 'largeur' : 'longueur';
+  switch (r.code){
+    case 'syntax_cleaned': return 'Commentaires ou virgules en trop retirés du texte.';
+    case 'unknown_field': return `Information non prévue ignorée : « ${r.field} »${inZone}.`;
+    case 'number_rounded': return `Nombre à virgule arrondi : ${r.from} devient ${r.to}${inZone}.`;
+    case 'map_size': return r.from && +r.from > 0
+      ? `Carte trop grande : ${side} ramenée de ${r.from} à ${r.to} cases, les positions suivent.`
+      : `Taille de carte absente : ${side} fixée à ${r.to} cases.`;
+    case 'biome': // the biome's own French name is no correction worth a line
+      return (BIOMES[r.to] || '').toLowerCase() === r.from.trim().toLowerCase() ? '' : `Biome « ${r.from} » compris comme « ${BIOMES[r.to] || r.to} ».`;
+    case 'elevation': return `Relief « ${r.from} » compris comme « ${ELEVATIONS[r.to] || r.to} »${inZone}.`;
+    case 'zone_id': return r.from
+      ? `Deux zones s’appelaient « ${r.from} » : la seconde devient « ${r.to} ».`
+      : `Zone sans identifiant, nommée « ${r.to} ».`;
+    case 'zone_size': return `Taille de la zone ${zone} ajustée (${r.from || 'absente'} → ${r.to}).`;
+    case 'anchor': return `Zone ${zone} replacée dans la carte, en ${r.to}.`;
+    case 'density': return r.to
+      ? `Densité « ${r.field} » ajustée${inZone}.`
+      : `Densité « ${r.field} » non reconnue, ignorée${inZone}.`;
+    case 'position': return `« ${poiName(r.field)} » placé ${r.to === 'scattered' ? 'au hasard dans la zone' : 'en ' + r.to}${inZone}.`;
+    case 'count': return `« ${poiName(r.field)} » dispersé sans nombre : un seul est placé${inZone}.`;
+    case 'poi_dropped': return `Un élément sans nom d’objet a été ignoré${inZone}.`;
+    case 'prop': return `Objet « ${r.from} » compris comme « ${poiName(r.to)} »${inZone}.`;
+    case 'relief': return `Sol « ${r.from} » compris comme « ${(LEGEND_NAMES[r.to] || r.to).toLowerCase()} »${inZone}.`;
+    case 'relief_dropped': return `Sol « ${r.from} » inconnu pour ce biome : la zone ${zone} garde le terrain naturel.`;
+    case 'connection_dropped': return `Chemin ignoré : il relie des zones qui n’existent pas (« ${r.from} » → « ${r.to} »).`;
+    case 'path_width': return `Largeur de chemin ramenée de ${r.from} à ${+r.to ? r.to + ' cases' : 'la largeur normale'}.`;
+    case 'building': return `Bâtiment « ${r.field} » ajusté (${r.from} → ${r.to}).`;
+    case 'building_dropped': return `Bâtiment « ${r.from} » inconnu : il n’est pas construit.`;
+  }
+  return r.code;
 }
 function gridStep(size){ return [5, 10, 20, 25, 50, 100].find((v) => size / v <= 6) || 100; }
 function el(tag, props = {}, text = ''){
@@ -882,6 +930,16 @@ function renderMap(data){
   $('oversize').textContent = 'Un morceau reste trop lourd pour TaleSpire (plus de 30 ko environ) : il se collera, mais le plateau risque de ne pas s’enregistrer. Allégez la zone concernée ou réduisez la taille de la carte, puis redemandez-la.';
   const warnings = (data.warnings || []).filter((w) => !heavy.includes(w)).map(frenchWarning);
   $('mapWarnings').replaceChildren(...warnings.map((t) => el('li', {}, t)));
+  // Slips the engine corrected by itself in the AI's reply: said, not hidden,
+  // and opened when something the GM asked for is missing from the map.
+  const repairs = data.repairs || [];
+  const repairLines = repairs.map((r) => frenchRepair(r, zones)).filter(Boolean);
+  $('repairsWrap').hidden = !repairLines.length;
+  $('repairsSummary').textContent = repairLines.length > 1
+    ? `Le Cartographe a corrigé ${repairLines.length} détails dans la réponse de l’IA`
+    : 'Le Cartographe a corrigé un détail dans la réponse de l’IA';
+  $('repairsList').replaceChildren(...repairLines.map((t) => el('li', {}, t)));
+  $('repairsWrap').open = repairs.some((r) => REPAIR_LOSSES.includes(r.code));
   // Names the AI made up: one message asks it to swap them for real objects.
   const unknown = data.unknown_props || [];
   $('unknownFix').hidden = !unknown.length;
@@ -1094,18 +1152,24 @@ function engineProgress({loaded, total}){
     : `Chargement du moteur de génération : ${mb(loaded)} Mo`;
 }
 function engineReady(){ clearTimeout(engineTimer); engineTimer = -1; $('engineStatus').hidden = true; }
-function engineFailed(){
+function engineFailed(e){
   clearTimeout(engineTimer); engineTimer = -1;
   $('engineBar').hidden = true; $('engineStatus').hidden = false;
-  $('engineText').textContent = 'Le moteur de génération n’a pas pu se charger. Vérifiez votre connexion, puis rechargez la page.';
+  const unsupported = e && e.detail && e.detail.reason === 'unsupported';
+  $('engineText').textContent = unsupported
+    ? 'Ce navigateur ne peut pas faire tourner le moteur de génération. Essayez avec une version récente de Chrome, Firefox, Safari ou Edge.'
+    : 'Le moteur de génération n’a pas pu se charger après plusieurs essais. Vérifiez votre connexion : votre texte est conservé.';
+  // Reloading starts the download afresh; what was typed is kept (sessionStorage).
+  $('engineRetry').hidden = unsupported;
 }
 window.addEventListener('cartographe:progress', (e) => { if (engineTimer !== -1) engineProgress(e.detail); });
 window.addEventListener('cartographe:ready', engineReady);
 window.addEventListener('cartographe:failed', engineFailed);
+$('engineRetry').onclick = () => location.reload();
 // Events sent before this script ran are summarised on window.
 if (window.cartographeEngine){
   const e = window.cartographeEngine;
-  if (e.state === 'ready') engineReady(); else if (e.state === 'failed') engineFailed(); else engineProgress(e);
+  if (e.state === 'ready') engineReady(); else if (e.state === 'failed') engineFailed({detail: e}); else engineProgress(e);
 }
 
 // Desktop-only capabilities.

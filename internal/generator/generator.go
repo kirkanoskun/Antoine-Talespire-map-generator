@@ -11,6 +11,7 @@
 package generator
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math"
 	"math/rand"
@@ -247,7 +248,7 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 	res.AssetCount = len(placements)
 
 	// Whole-map slab (always produced, for a single copy-paste).
-	code, err := g.encodeRegion(placements, 0, 0)
+	code, err := g.encodeRegion(placements, 0, 0, field.Length)
 	if err != nil {
 		return nil, err
 	}
@@ -328,25 +329,35 @@ type placement struct {
 	z            int
 	baseRotation int
 	imported     *slab.Layout
+	// mirror is, for an imported layout, what to subtract after flipping its Z
+	// (see encodeRegion): twice the offset of the piece's centre from its origin.
+	mirror int
 }
 
 // encodeRegion builds and encodes a single slab from the placements whose tile
 // falls in the region [originX, originX+size) — or all placements when size is
 // non-positive — with coordinates rebased to (originX, originY).
-func (g *Generator) encodeRegion(placements []placement, originX, originY int) (string, error) {
+//
+// The map's y grows to the south, the game's Z to the north: every position is
+// mirrored here, on the way out, so the game shows what the preview shows.
+// length is the region's extent in tiles along y. An asset is flipped about
+// the region's middle as a whole, not mirrored itself, so the row it lands on
+// depends on where its origin sits: a tile's is at its corner (row y becomes
+// length-1-y), a prop's at its centre (the point y becomes the point length-y).
+func (g *Generator) encodeRegion(placements []placement, originX, originY, length int) (string, error) {
 	terrain := &taleslabentities.Slab{}
 	var imported []slab.Layout
 	importedIndex := map[string]int{}
 	for i := range placements {
 		p := &placements[i]
 		if p.imported == nil {
-			terrain.Assets = append(terrain.Assets, buildAsset(p, originX, originY))
+			terrain.Assets = append(terrain.Assets, buildAsset(p, originX, originY, length, g.mirrorShift(p.part)))
 		} else {
 			l := *p.imported
 			l.Instances = append([]slab.Instance(nil), l.Instances...)
 			for j := range l.Instances {
 				l.Instances[j].X -= originX * 100
-				l.Instances[j].Z -= originY * 100
+				l.Instances[j].Z = max(0, length*100-(l.Instances[j].Z-originY*100)-p.mirror)
 			}
 			key := fmt.Sprintf("%x/%d", l.ID, l.Reserved)
 			if idx, ok := importedIndex[key]; ok {
@@ -398,7 +409,7 @@ func (g *Generator) encodeSlices(placements []placement, w, l, size int) ([][]st
 	for sx := 0; sx < nx; sx++ {
 		slices[sx] = make([]string, ny)
 		for sy := 0; sy < ny; sy++ {
-			code, err := g.encodeRegion(buckets[sx][sy], sx*size, sy*size)
+			code, err := g.encodeRegion(buckets[sx][sy], sx*size, sy*size, min(size, l-sy*size))
 			if err != nil {
 				return nil, err
 			}
@@ -795,10 +806,11 @@ func distributionFor(pb *taleslabentities.PropBlocks, e elementtype.ElementType)
 // (taleslab's convention); the rotation is nudged by the global row so tiling
 // props don't look uniform (using the global tileY keeps a single-slab map's
 // output identical whether or not slicing is enabled).
-func buildAsset(p *placement, originX, originY int) *taleslabentities.Asset {
+func buildAsset(p *placement, originX, originY, length, shift int) *taleslabentities.Asset {
 	part := p.part
 	x := p.tileX - originX
-	y := p.tileY - originY
+	// Mirrored north-south (see encodeRegion).
+	y := max(0, length-(p.tileY-originY)-shift)
 	return &taleslabentities.Asset{
 		ID:         part.ID,
 		Name:       part.Name,
@@ -851,4 +863,16 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// mirrorShift is how many tiles to step back after flipping an asset's row
+// (see encodeRegion): 1 when its origin is at its corner, as for ground tiles,
+// 0 when it is at its centre, as for props. Read from the full catalogue.
+func (g *Generator) mirrorShift(part *taleslabentities.Part) int {
+	if g.assets != nil {
+		if a, ok := g.assets.ByID(base64.StdEncoding.EncodeToString(part.ID)); ok {
+			return int(math.Round(2 * a.Center[1]))
+		}
+	}
+	return 1
 }

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 
+	"github.com/johnfercher/taleslab/pkg/taleslab/taleslabdomain/taleslabconsts/biometype"
 	"github.com/johnfercher/taleslab/pkg/taleslab/taleslabdomain/taleslabentities"
 
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/catalogs"
@@ -83,6 +85,12 @@ func (g *Generator) placeObjects(doc *ir.IR, mask *spatial.Mask, f *HeightField,
 			w, d := a.Footprint[0], a.Footprint[1]
 			if !poi.Position.Scattered {
 				x, y := poi.Position.X, poi.Position.Y
+				// An object placed too close to the east or south edge is slid
+				// back inside rather than dropped: the scene keeps its fountain.
+				if fx, fy := min(x, max(f.Width-w, 0)), min(y, max(f.Length-d, 0)); (fx != x || fy != y) && w <= f.Width && d <= f.Length {
+					res.Warnings = append(res.Warnings, fmt.Sprintf("zone %q: POI %q moved from (%d,%d) to (%d,%d) to fit in the map", zone.ID, poi.Prop, x, y, fx, fy))
+					x, y = fx, fy
+				}
 				if reason := f.objectBlocked(x, y, w, d); reason != "" {
 					res.Warnings = append(res.Warnings, fmt.Sprintf("zone %q: POI %q %s (skipped)", zone.ID, poi.Prop, reason))
 					continue
@@ -201,5 +209,36 @@ func (f *HeightField) seatObject(a *catalogs.Asset, x, y int) (placement, error)
 	if inst.X > slab.MaxCoordinate || inst.Y > slab.MaxCoordinate || inst.Z > slab.MaxCoordinate {
 		return placement{}, fmt.Errorf("object %q exceeds Slab coordinate limits", a.Slug)
 	}
-	return placement{tileX: x, tileY: y, imported: &slab.Layout{ID: id, Instances: []slab.Instance{inst}}}, nil
+	// Bucketed by its south-west tile: once mirrored (encodeRegion), that is the
+	// corner nearest the slab's origin, so a slice never gets a negative position.
+	return placement{
+		tileX: x, tileY: y + d - 1,
+		imported: &slab.Layout{ID: id, Instances: []slab.Instance{inst}},
+		mirror:   int(math.Round(2 * a.Center[1] * 100)),
+	}, nil
+}
+
+// Lenient returns what ir.ParseLenient needs from this generator's catalogues
+// to fall back gracefully: the reliefs of each biome, the names it can place
+// and the buildings it knows.
+func (g *Generator) Lenient() *ir.Catalogue {
+	return &ir.Catalogue{
+		Reliefs: func(biome string) []string {
+			b := g.biomes.GetBiome(biometype.BiomeType(biome))
+			if b == nil {
+				return nil
+			}
+			keys := make([]string, 0, len(b.Reliefs))
+			for key := range b.Reliefs {
+				keys = append(keys, string(key))
+			}
+			sort.Strings(keys)
+			return keys
+		},
+		KnownProp: g.KnownProp,
+		KnownPrefab: func(id string) bool {
+			_, ok := g.prefabs.Get(id)
+			return ok
+		},
+	}
 }

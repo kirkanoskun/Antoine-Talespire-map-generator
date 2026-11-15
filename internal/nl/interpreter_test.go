@@ -130,6 +130,12 @@ func TestExtractJSON(t *testing.T) {
 		"```json\n{\"a\":1}\n```": `{"a":1}`,
 		"```\n{\"a\":1}\n```":     `{"a":1}`,
 		"no braces here":          "",
+		// Several objects: the last complete map wins, not a span across them.
+		"v1 {\"map\":{},\"zones\":[1]} puis v2 {\"map\":{},\"zones\":[2]}":   `{"map":{},"zones":[2]}`,
+		"{\"map\":{},\"zones\":[]}\nNote : {important}":                      `{"map":{},"zones":[]}`,
+		"Elle a dit \"voilà\" : {\"map\":{\"name\":\"a } b\"},\"zones\":[]}": `{"map":{"name":"a } b"},"zones":[]}`,
+		// Truncated: the cut-off map itself, so it is reported as cut off.
+		"Voici {\"map\":{\"width\":40},\"zones\":[{\"id\":\"a\"}": `{"map":{"width":40},"zones":[{"id":"a"}`,
 	}
 	for in, want := range cases {
 		if got := ExtractJSON(in); got != want {

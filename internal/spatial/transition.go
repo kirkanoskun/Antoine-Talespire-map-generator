@@ -67,7 +67,7 @@ func (m *Mask) Transitions(halfWidth int) *Transitions {
 			if t.dist[n.x][n.y] == 0 { // unset
 				t.dist[n.x][n.y] = d + 1
 				t.other[n.x][n.y] = t.other[c.x][c.y]
-				queue = append(queue, cell{n.x, n.y})
+				queue = append(queue, cell(n))
 			}
 		}
 	}

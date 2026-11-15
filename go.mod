@@ -1,6 +1,6 @@
 module github.com/kirkanoskun/antoine-talespire-map-generator
 
-go 1.24.7
+go 1.26.11
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.60.0
