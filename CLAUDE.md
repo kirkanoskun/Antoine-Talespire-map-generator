@@ -406,6 +406,19 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   1, height to confirm in game). The preview draws flagstones and mud textures
   and outlines each object's footprint with its pin at the centre.
 - **Size.** The engine grows from 14.1 to 15.2 MB raw (3.05 -> 3.30 MB gzip).
+- **Varied scatter (review item B1).** The biomes scatter 45 more props
+  taken from the catalogue (`configs/props.json`, appended): autumn and cypress
+  trees, stumps, bushes, mushroom patches, roots, logs, mossy and grey rocks,
+  pebbles, round cacti, snow boulders, lava spikes and a hell tree, horsetails.
+  Weights are unchanged, so density and the preview stay the same; only which
+  prop is drawn changes (the golden changed, the sample map did not). The swamp
+  no longer borrows pines: it grows `swamp_tree` (trunk + canopy stacked at
+  step 1 and 9) and `swamp_tree_trunk`. `jungle_tree_tall` stacks the same way
+  (steps 1 and 5); `TestStackedTreesRestOnTheirTrunk` holds a canopy on its
+  trunk's height. New ids never reuse a catalogue slug, so a point of interest
+  naming a catalogue object keeps its exact placement. Every `ground` relief
+  offers at least ten props (`TestBiomesScatterAVariedCatalogue`). In-game
+  validation of the stacked trees pending.
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.

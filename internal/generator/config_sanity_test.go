@@ -2,7 +2,9 @@ package generator
 
 import (
 	"encoding/json"
+	"math"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -208,7 +210,7 @@ func TestConfigSceneReliefs(t *testing.T) {
 	if blocks, _, misc := relief("swamp", "swamp_floor"); len(blocks) != 1 || blocks[0] != "mud_small" || misc[0] != "swamp_reed_01" {
 		t.Errorf("swamp_floor blocks = %v, misc = %v", blocks, misc)
 	}
-	if _, veg, _ := relief("swamp", "water"); len(veg) != 3 || veg[0] != "swamp_lily_pad_01" {
+	if _, veg, _ := relief("swamp", "water"); len(veg) < 3 || veg[0] != "swamp_lily_pad_01" {
 		t.Errorf("swamp water vegetation = %v", veg)
 	}
 	cat, err := Assets()
@@ -223,6 +225,97 @@ func TestConfigSceneReliefs(t *testing.T) {
 			if len(p.Parts) != 1 || p.Parts[0].ID != a.ID {
 				t.Errorf("props.json %s does not carry the catalogue's id %s", p.ID, a.ID)
 			}
+		}
+	}
+}
+
+// B1 of the 2026-11-14 review: the scatter draws on the full catalogue, not
+// the handful of trees and rocks taleslab shipped. Every biome's main ground
+// offers at least ten different things, and every scattered piece is a prop of
+// the game's catalogue (a tile would be a floor, not a plant).
+func TestBiomesScatterAVariedCatalogue(t *testing.T) {
+	var biomes biomeCatalog
+	loadJSON(t, "biomes.json", &biomes)
+	var props propCatalog
+	loadJSON(t, "props.json", &props)
+	parts := make(map[string][]string, len(props))
+	for _, p := range props {
+		for _, part := range p.Parts {
+			parts[p.ID] = append(parts[p.ID], part.ID)
+		}
+	}
+	cat, err := Assets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range biomes {
+		for _, r := range b.Reliefs {
+			distinct := map[string]bool{}
+			for name, pb := range r.PropBlocks {
+				for _, p := range pb.Props {
+					distinct[p] = true
+					for _, id := range parts[p] {
+						if a, ok := cat.ByID(id); !ok || a.Kind != "prop" {
+							t.Errorf("%s/%s/%s: %q is not a catalogue prop", b.BiomeType, r.Key, name, p)
+						}
+					}
+				}
+			}
+			if r.Key == "ground" && len(distinct) < 10 {
+				t.Errorf("%s/ground scatters only %d different props, want at least 10", b.BiomeType, len(distinct))
+			}
+		}
+	}
+}
+
+// A swamp grows swamp trees, not the pines it used to borrow.
+func TestSwampGrowsSwampTrees(t *testing.T) {
+	var biomes biomeCatalog
+	loadJSON(t, "biomes.json", &biomes)
+	for _, b := range biomes {
+		if b.BiomeType != "swamp" {
+			continue
+		}
+		for _, r := range b.Reliefs {
+			for _, p := range r.PropBlocks["vegetation"].Props {
+				if strings.Contains(p, "pine") {
+					t.Errorf("swamp/%s vegetation holds %q", r.Key, p)
+				}
+			}
+		}
+	}
+}
+
+// A tree built from stacked pieces puts each piece on top of the one below:
+// its offset (in half-tile steps) is the previous one's plus that piece's
+// height, so the canopy neither floats nor sinks into the trunk.
+func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
+	var props []struct {
+		ID    string `json:"id"`
+		Parts []struct {
+			ID      string `json:"id"`
+			OffsetZ int    `json:"offset_z"`
+		} `json:"asset_parts"`
+	}
+	loadJSON(t, "props.json", &props)
+	cat, err := Assets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range props {
+		if p.ID != "swamp_tree" && p.ID != "jungle_tree_tall" {
+			continue
+		}
+		if len(p.Parts) != 2 {
+			t.Fatalf("%s has %d pieces, want a trunk and a canopy", p.ID, len(p.Parts))
+		}
+		trunk, ok := cat.ByID(p.Parts[0].ID)
+		if !ok {
+			t.Fatalf("%s: trunk %s not in the catalogue", p.ID, p.Parts[0].ID)
+		}
+		want := p.Parts[0].OffsetZ + int(math.Round(trunk.Size[2]*2))
+		if got := p.Parts[1].OffsetZ; got != want {
+			t.Errorf("%s: canopy at step %d, want %d (on top of a %.2f-tile trunk)", p.ID, got, want, trunk.Size[2])
 		}
 	}
 }
