@@ -1138,5 +1138,735 @@
         "offset_z": 1
       }
     ]
+  },
+  {
+    "id": "autumn_tree",
+    "asset_parts": [
+      {
+        "id": "AACSX8+WmZ3xR6Di3B2hyb5K",
+        "name": "dead_tree_01_falling_maple_leaves",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "cypress_tree",
+    "asset_parts": [
+      {
+        "id": "AAC2XLdjkyRkQ4rLk0MwStr2",
+        "name": "cypress_tree_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "pine_stump",
+    "asset_parts": [
+      {
+        "id": "AADca6blzDcXQ7TGobiMM5Lp",
+        "name": "stackable_pine_stump",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_tree",
+    "asset_parts": [
+      {
+        "id": "AACUxVa7qvilT4oL8FmlpFrh",
+        "name": "swamp_tree_base_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      },
+      {
+        "id": "AAAJwulTUPqKQI+jDJu52wu3",
+        "name": "swamp_tree_mid_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 9
+      },
+      {
+        "id": "AABl4KLv73ccSrQ79D8bnq9m",
+        "name": "swamp_tree_top",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 13
+      }
+    ]
+  },
+  {
+    "id": "swamp_tree_bare",
+    "asset_parts": [
+      {
+        "id": "AACUxVa7qvilT4oL8FmlpFrh",
+        "name": "swamp_tree_base_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      },
+      {
+        "id": "AABl4KLv73ccSrQ79D8bnq9m",
+        "name": "swamp_tree_top",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 9
+      }
+    ]
+  },
+  {
+    "id": "swamp_tree_trunk",
+    "asset_parts": [
+      {
+        "id": "AAA7zeO9XtZwSLOCZoxCLieD",
+        "name": "swamp_tree_base_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "jungle_tree_tall",
+    "asset_parts": [
+      {
+        "id": "AACAEHtqpIolR6LHjDYS8U2B",
+        "name": "jungle_tree_base_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      },
+      {
+        "id": "AACcAjwU1jQhSKXTdkNxFLfg",
+        "name": "jungle_tree_top_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 5
+      }
+    ]
+  },
+  {
+    "id": "hell_tree",
+    "asset_parts": [
+      {
+        "id": "AADYGbBCc2n2SJLnJtNWIdqx",
+        "name": "hell_tree_crisp",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "grey_rock_large",
+    "asset_parts": [
+      {
+        "id": "AAD2RLvE/+xNRKGWSeqnb0qn",
+        "name": "rock_large001",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "grey_rock_wide",
+    "asset_parts": [
+      {
+        "id": "AAD6iFA/6wk8QKOVoTFAbwRv",
+        "name": "rock_large002",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mossy_rock_large",
+    "asset_parts": [
+      {
+        "id": "AADF5HDFlwyxQ7It3I5AKATF",
+        "name": "rock_mossy_large001",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mossy_rock",
+    "asset_parts": [
+      {
+        "id": "AAB0XCUuamw9RqKi2Nl8Mnv+",
+        "name": "moss_rock_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "pebbles",
+    "asset_parts": [
+      {
+        "id": "AACOH6hrnJpFR5kPLLJ7spz8",
+        "name": "rock_pebbles_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "snow_boulder",
+    "asset_parts": [
+      {
+        "id": "AABSzil8gl+JSJV5PWvWwoCl",
+        "name": "boulder_large_snow",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "desert_rock",
+    "asset_parts": [
+      {
+        "id": "AAAp0en0dcH7TpRiZieTFxRD",
+        "name": "desert_cliff_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "desert_boulder",
+    "asset_parts": [
+      {
+        "id": "AABoIPzN5vSgQpZyzZn/FiUJ",
+        "name": "desert_cliff_05",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "desert_pebbles",
+    "asset_parts": [
+      {
+        "id": "AAC8BqcxmvN7QrZtgPfVLoDi",
+        "name": "desert_cliff04_pile",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "lava_spike_small",
+    "asset_parts": [
+      {
+        "id": "AAC9mHcbCUC/Sbf60pF40CjN",
+        "name": "hell_spike_crisp_v1",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "lava_spike_tall",
+    "asset_parts": [
+      {
+        "id": "AACe4m2CCI93T7ZC/AT+jV+w",
+        "name": "hell_spike_crisp_v2",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "wild_bush",
+    "asset_parts": [
+      {
+        "id": "AABJ4VNZ6euvSI29EUd1CAqG",
+        "name": "bush_wild_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "round_bush",
+    "asset_parts": [
+      {
+        "id": "AADWfSsQ2yaERZbpuys6z/ys",
+        "name": "boxwood_wild_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "berry_bush",
+    "asset_parts": [
+      {
+        "id": "AAAPiuwBcSnbTZYSmM5sLTFe",
+        "name": "bush_berry_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "low_bush",
+    "asset_parts": [
+      {
+        "id": "AADqcxZIqCnmQ6D0g+RVUGE3",
+        "name": "bush_reg_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "rose_bush",
+    "asset_parts": [
+      {
+        "id": "AACE8Lts+0G+QqWgujmIu9NF",
+        "name": "brush_rose_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "thorn_bush",
+    "asset_parts": [
+      {
+        "id": "AAAJuGfV2RQkR47M1+UB7mHM",
+        "name": "bush_thorns_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mushroom_patch_a",
+    "asset_parts": [
+      {
+        "id": "AADXX8bFDRmdS4xXt/miN47l",
+        "name": "mushroom_patch_forest_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mushroom_patch_b",
+    "asset_parts": [
+      {
+        "id": "AADLnqs9XfLtQ67BcZ0+Woko",
+        "name": "mushroom_patch_forest_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mushroom_patch_c",
+    "asset_parts": [
+      {
+        "id": "AAC/BBlvA2o6TKcQJyLSPWOX",
+        "name": "mushroom_patch_forest_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mushroom_patch_long",
+    "asset_parts": [
+      {
+        "id": "AAAZMf5nqtHXS5jKuvrY9VPa",
+        "name": "mushroom_patch_forest_04",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "forest_root_long",
+    "asset_parts": [
+      {
+        "id": "AAAoODiwHs9cRpYvRtKaWOTe",
+        "name": "root_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "forest_root_small",
+    "asset_parts": [
+      {
+        "id": "AAA2uOsqVZKeSayd39jxOByX",
+        "name": "root_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "forest_root_spread",
+    "asset_parts": [
+      {
+        "id": "AAC1VKKdfA6tR5o00gF5hLFV",
+        "name": "root_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "mossy_log",
+    "asset_parts": [
+      {
+        "id": "AAB6LPM+q93BQarES1mrrRk+",
+        "name": "log_with_moss",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "chopped_log",
+    "asset_parts": [
+      {
+        "id": "AACCZsELqUpdS5hOJ1aBcESl",
+        "name": "stackable_pine_chopped",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "philodendron",
+    "asset_parts": [
+      {
+        "id": "AAC+HK1GVAg2SqI4ra17QIzr",
+        "name": "jungle_plant_philodendron_single",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "jungle_pitcher_plant",
+    "asset_parts": [
+      {
+        "id": "AAA7OtJA1KolR6uUTnHDeyoy",
+        "name": "pitcher_plant",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "jungle_vine_floor",
+    "asset_parts": [
+      {
+        "id": "AADE+DgvannoS6UH6/dhuqSm",
+        "name": "vine_strand_floor_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "round_cactus_group",
+    "asset_parts": [
+      {
+        "id": "AACBbDfRfkvoT7ShILM3nK7Q",
+        "name": "cactus_round_group",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "round_cactus",
+    "asset_parts": [
+      {
+        "id": "AABBk19tjDnkSoR7Kln4i8tO",
+        "name": "cactus_round_single_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "round_cactus_small",
+    "asset_parts": [
+      {
+        "id": "AADxZbvSqyqhRrN83vMqDuEW",
+        "name": "cactus_round_single_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "snow_mound_flat",
+    "asset_parts": [
+      {
+        "id": "AADMkQycRTTkQ49cbJaymn49",
+        "name": "snowy_mound_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_horsetail_thin",
+    "asset_parts": [
+      {
+        "id": "AADZOojuj3WOSIxO8wCr2G6M",
+        "name": "swamp_reed_horsetail_02",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_horsetail_tall",
+    "asset_parts": [
+      {
+        "id": "AADeqH/nwdnsSY0WI/x76ClZ",
+        "name": "swamp_reed_horsetail_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_horsetail_bushy",
+    "asset_parts": [
+      {
+        "id": "AABf6hGEfFf6S4br5Zjy+lDt",
+        "name": "swamp_reed_horsetail_05",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "swamp_lily_pad_flower",
+    "asset_parts": [
+      {
+        "id": "AACMoTia/UTPTZlXww4jTYhF",
+        "name": "swamp_lily_pad_03",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "hell_spear_plant",
+    "asset_parts": [
+      {
+        "id": "AAA3H52xEf4+RK0q8nflt1JG",
+        "name": "hell_plant_spear_v1",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
   }
 ]

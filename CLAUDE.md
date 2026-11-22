@@ -406,6 +406,27 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   1, height to confirm in game). The preview draws flagstones and mud textures
   and outlines each object's footprint with its pin at the centre.
 - **Size.** The engine grows from 14.1 to 15.2 MB raw (3.05 -> 3.30 MB gzip).
+- **Varied scatter (review item B1).** The biomes scatter 45 more props
+  taken from the catalogue (`configs/props.json`, appended): autumn and cypress
+  trees, stumps, bushes, mushroom patches, roots, logs, mossy and grey rocks,
+  pebbles, round cacti, snow boulders, lava spikes and a hell tree, horsetails.
+  Weights are unchanged, so density and the preview stay the same; only which
+  prop is drawn changes (the golden changed, the sample map did not). The swamp
+  no longer borrows pines: it grows `swamp_tree` (root base, crown of branches
+  and tip, stacked at steps 1, 9 and 13), `swamp_tree_bare` (base and tip) and
+  `swamp_tree_trunk`. `jungle_tree_tall` stacks a base and a canopy (steps 1
+  and 5). Each piece rests on the one below (offset = previous offset + its
+  height in steps, `TestStackedTreesRestOnTheirTrunk`). The pieces share one
+  grid position (talescoder has no sub-tile offset), so only a base whose
+  trunk stands at the centre of its bounds can carry one: in game the tip set
+  on `swamp_tree_base_01` stood half a tile aside, so that base only grows
+  alone (`swamp_tree_trunk`) and both stacked swamp trees use
+  `swamp_tree_base_02`. Validated in game (22 Nov): the jungle tree, the
+  three-piece swamp tree and the bare swamp tree on base_02, every trunk
+  continuous. New ids never reuse a catalogue slug, so a point of interest naming
+  a catalogue object keeps its exact placement. Every `ground` relief offers
+  at least ten props (`TestBiomesScatterAVariedCatalogue`). In game (15 Nov)
+  the forest, swamp and jungle maps showed every new prop seated on the ground.
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.

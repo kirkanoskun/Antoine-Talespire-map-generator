@@ -44,13 +44,15 @@
      "stones": {
       "weight": 0.05,
       "props": [
-       "one_small_rock-z1"
+       "one_small_rock-z1",
+       "pebbles"
       ]
      },
      "misc": {
       "weight": 0.01,
       "props": [
-       "coconut"
+       "coconut",
+       "low_bush"
       ]
      }
     }
@@ -65,13 +67,16 @@
       "weight": 0.2,
       "props": [
        "pine_tree_big",
-       "two_floor_pine_tree"
+       "two_floor_pine_tree",
+       "bush_tree",
+       "cypress_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -80,7 +85,10 @@
        "rose",
        "floor_bush",
        "small_fern",
-       "big_fern"
+       "big_fern",
+       "low_bush",
+       "berry_bush",
+       "wild_bush"
       ]
      }
     }
@@ -95,13 +103,16 @@
       "weight": 0.1,
       "props": [
        "pine_tree_big",
-       "two_floor_pine_tree"
+       "two_floor_pine_tree",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "grey_rock_large",
+       "grey_rock_wide"
       ]
      },
      "misc": {
@@ -166,13 +177,17 @@
        "cut_tree_with_moss",
        "dead_tree_big",
        "bush_tree",
-       "tree_trunk"
+       "tree_trunk",
+       "autumn_tree",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.05,
       "props": [
-       "one_small_rock-z1"
+       "one_small_rock-z1",
+       "mossy_rock",
+       "pebbles"
       ]
      },
      "misc": {
@@ -184,7 +199,13 @@
        "big_fern",
        "rectangle_bush_small",
        "many_ground_red_leaves",
-       "few_ground_red_leaves"
+       "few_ground_red_leaves",
+       "mushroom_patch_a",
+       "forest_root_small",
+       "mossy_log",
+       "berry_bush",
+       "wild_bush",
+       "round_bush"
       ]
      }
     }
@@ -207,13 +228,18 @@
        "cut_tree_with_moss",
        "dead_tree_big",
        "bush_tree",
-       "tree_trunk"
+       "tree_trunk",
+       "autumn_tree",
+       "cypress_tree",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock",
+       "mossy_rock_large"
       ]
      },
      "misc": {
@@ -225,7 +251,22 @@
        "big_fern",
        "rectangle_bush_small",
        "many_ground_red_leaves",
-       "few_ground_red_leaves"
+       "few_ground_red_leaves",
+       "mushroom_patch_a",
+       "mushroom_patch_b",
+       "mushroom_patch_c",
+       "mushroom_patch_long",
+       "forest_root_long",
+       "forest_root_small",
+       "forest_root_spread",
+       "mossy_log",
+       "chopped_log",
+       "berry_bush",
+       "wild_bush",
+       "round_bush",
+       "low_bush",
+       "rose_bush",
+       "thorn_bush"
       ]
      }
     }
@@ -243,13 +284,18 @@
        "two_floor_pine_tree",
        "one_big_tree",
        "dead_tree_big",
-       "tree_trunk"
+       "tree_trunk",
+       "autumn_tree",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "grey_rock_large",
+       "grey_rock_wide",
+       "mossy_rock_large"
       ]
      },
      "misc": {
@@ -258,7 +304,10 @@
        "rose",
        "floor_bush",
        "small_fern",
-       "big_fern"
+       "big_fern",
+       "forest_root_long",
+       "low_bush",
+       "wild_bush"
       ]
      }
     }
@@ -298,7 +347,10 @@
        "tree_trunk",
        "cut_tree_with_moss",
        "pile_of_skulls",
-       "down_skeleton"
+       "down_skeleton",
+       "thorn_bush",
+       "mushroom_patch_b",
+       "forest_root_spread"
       ]
      }
     }
@@ -377,7 +429,9 @@
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "desert_rock",
+       "desert_pebbles"
       ]
      },
      "misc": {
@@ -385,7 +439,11 @@
       "props": [
        "bull_skull",
        "down_rib",
-       "up_rib"
+       "up_rib",
+       "round_cactus_group",
+       "round_cactus",
+       "round_cactus_small",
+       "small_dead_bush"
       ]
      }
     }
@@ -406,7 +464,10 @@
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "desert_rock",
+       "desert_boulder",
+       "desert_pebbles"
       ]
      },
      "misc": {
@@ -414,7 +475,11 @@
       "props": [
        "bull_skull",
        "down_rib",
-       "up_rib"
+       "up_rib",
+       "round_cactus_group",
+       "round_cactus",
+       "round_cactus_small",
+       "small_dead_bush"
       ]
      }
     }
@@ -435,7 +500,9 @@
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "desert_rock",
+       "desert_boulder"
       ]
      },
      "misc": {
@@ -443,7 +510,9 @@
       "props": [
        "bull_skull",
        "down_rib",
-       "up_rib"
+       "up_rib",
+       "round_cactus_group",
+       "desert_pebbles"
       ]
      }
     }
@@ -492,20 +561,24 @@
        "snow_two_floor_pine_tree_with_trunk",
        "snow_two_floor_pine_tree",
        "snow_pine_tree_big",
-       "dead_tree_big"
+       "dead_tree_big",
+       "snow_dead_tree_big"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "snow_stone_small"
+       "snow_stone_small",
+       "snow_boulder",
+       "snow_stone_big"
       ]
      },
      "misc": {
       "weight": 0.01,
       "props": [
        "small_dead_bush",
-       "big_dead_bush"
+       "big_dead_bush",
+       "snow_mound_flat"
       ]
      }
     }
@@ -522,20 +595,24 @@
        "snow_two_floor_pine_tree_with_trunk",
        "snow_two_floor_pine_tree",
        "snow_pine_tree_big",
-       "dead_tree_big"
+       "dead_tree_big",
+       "snow_dead_tree_big"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "snow_stone_small"
+       "snow_stone_small",
+       "snow_boulder",
+       "snow_stone_big"
       ]
      },
      "misc": {
       "weight": 0.01,
       "props": [
        "small_dead_bush",
-       "big_dead_bush"
+       "big_dead_bush",
+       "snow_mound_flat"
       ]
      }
     }
@@ -552,20 +629,24 @@
        "snow_two_floor_pine_tree_with_trunk",
        "snow_two_floor_pine_tree",
        "snow_pine_tree_big",
-       "dead_tree_big"
+       "dead_tree_big",
+       "snow_dead_tree_big"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "snow_stone_small"
+       "snow_stone_small",
+       "snow_boulder",
+       "big_snow_stone_wall"
       ]
      },
      "misc": {
       "weight": 0.01,
       "props": [
        "small_dead_bush",
-       "big_dead_bush"
+       "big_dead_bush",
+       "snow_mound_flat"
       ]
      }
     }
@@ -616,13 +697,16 @@
       "props": [
        "one_big_tree",
        "two_big_tree",
-       "three_big_tree"
+       "three_big_tree",
+       "jungle_tree_tall",
+       "coconut_tree_small"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "one_small_rock-z0"
+       "one_small_rock-z0",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -630,7 +714,13 @@
       "props": [
        "small_leaves_bug",
        "big_leaves_bug",
-       "floor_bush"
+       "floor_bush",
+       "philodendron",
+       "jungle_pitcher_plant",
+       "jungle_vine_floor",
+       "mossy_log",
+       "small_fern",
+       "big_fern"
       ]
      }
     }
@@ -649,13 +739,17 @@
       "props": [
        "one_big_tree",
        "two_big_tree",
-       "three_big_tree"
+       "three_big_tree",
+       "jungle_tree_tall",
+       "coconut_tree_small",
+       "bush_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "one_small_rock-z0"
+       "one_small_rock-z0",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -663,7 +757,15 @@
       "props": [
        "small_leaves_bug",
        "big_leaves_bug",
-       "floor_bush"
+       "floor_bush",
+       "philodendron",
+       "jungle_pitcher_plant",
+       "jungle_vine_floor",
+       "mossy_log",
+       "forest_root_spread",
+       "mushroom_patch_c",
+       "small_fern",
+       "big_fern"
       ]
      }
     }
@@ -682,13 +784,16 @@
       "props": [
        "one_big_tree",
        "two_big_tree",
-       "three_big_tree"
+       "three_big_tree",
+       "jungle_tree_tall"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "one_small_rock-z0"
+       "one_small_rock-z0",
+       "mossy_rock",
+       "mossy_rock_large"
       ]
      },
      "misc": {
@@ -696,7 +801,10 @@
       "props": [
        "small_leaves_bug",
        "big_leaves_bug",
-       "floor_bush"
+       "floor_bush",
+       "philodendron",
+       "jungle_vine_floor",
+       "big_fern"
       ]
      }
     }
@@ -750,13 +858,15 @@
        "dead_tree_big",
        "dead_tree_small",
        "dead_tree_tiny",
-       "cut_tree_with_moss"
+       "cut_tree_with_moss",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -771,7 +881,12 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "forest_root_long",
+       "forest_root_spread",
+       "mushroom_patch_a",
+       "thorn_bush",
+       "chopped_log"
       ]
      }
     }
@@ -793,13 +908,15 @@
        "dead_tree_big",
        "dead_tree_small",
        "dead_tree_tiny",
-       "cut_tree_with_moss"
+       "cut_tree_with_moss",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -814,7 +931,15 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "forest_root_long",
+       "forest_root_small",
+       "forest_root_spread",
+       "mushroom_patch_a",
+       "mushroom_patch_long",
+       "thorn_bush",
+       "mossy_log",
+       "chopped_log"
       ]
      }
     }
@@ -836,13 +961,16 @@
        "dead_tree_big",
        "dead_tree_small",
        "dead_tree_tiny",
-       "cut_tree_with_moss"
+       "cut_tree_with_moss",
+       "pine_stump"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "grey_rock_large",
+       "grey_rock_wide"
       ]
      },
      "misc": {
@@ -857,7 +985,9 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "forest_root_spread",
+       "thorn_bush"
       ]
      }
     }
@@ -908,13 +1038,16 @@
        "dead_tree_big",
        "dead_tree_small",
        "dead_tree_tiny",
-       "cut_tree_with_moss"
+       "cut_tree_with_moss",
+       "hell_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "lava_spike_small",
+       "lava_spike_tall"
       ]
      },
      "misc": {
@@ -929,7 +1062,8 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "hell_spear_plant"
       ]
      }
     }
@@ -949,13 +1083,16 @@
        "dead_tree_big",
        "dead_tree_small",
        "dead_tree_tiny",
-       "cut_tree_with_moss"
+       "cut_tree_with_moss",
+       "hell_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "lava_spike_small",
+       "lava_spike_tall"
       ]
      },
      "misc": {
@@ -970,7 +1107,8 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "hell_spear_plant"
       ]
      }
     }
@@ -989,13 +1127,16 @@
        "dead_tree_big",
        "dead_tree_small",
        "dead_tree_tiny",
-       "cut_tree_with_moss"
+       "cut_tree_with_moss",
+       "hell_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "lava_spike_small",
+       "lava_spike_tall"
       ]
      },
      "misc": {
@@ -1010,7 +1151,8 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "hell_spear_plant"
       ]
      }
     }
@@ -1032,7 +1174,8 @@
       "props": [
        "swamp_lily_pad_01",
        "swamp_lily_pad_02",
-       "swamp_lily_flower"
+       "swamp_lily_flower",
+       "swamp_lily_pad_flower"
       ]
      },
      "stones": {
@@ -1058,13 +1201,18 @@
      "vegetation": {
       "weight": 0.2,
       "props": [
-       "pine_tree_big"
+       "swamp_tree",
+       "swamp_tree_bare",
+       "swamp_tree_trunk",
+       "dead_tree_tiny",
+       "bush_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -1079,7 +1227,12 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "swamp_horsetail_thin",
+       "swamp_horsetail_bushy",
+       "mushroom_patch_a",
+       "forest_root_spread",
+       "mossy_log"
       ]
      }
     }
@@ -1093,13 +1246,18 @@
      "vegetation": {
       "weight": 0.1,
       "props": [
-       "pine_tree_big"
+       "swamp_tree",
+       "swamp_tree_bare",
+       "swamp_tree_trunk",
+       "dead_tree_tiny",
+       "bush_tree"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock"
       ]
      },
      "misc": {
@@ -1114,7 +1272,13 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "swamp_horsetail_thin",
+       "swamp_horsetail_bushy",
+       "mushroom_patch_a",
+       "mushroom_patch_long",
+       "forest_root_spread",
+       "mossy_log"
       ]
      }
     }
@@ -1128,13 +1292,18 @@
      "vegetation": {
       "weight": 0.2,
       "props": [
-       "pine_tree_big"
+       "swamp_tree",
+       "swamp_tree_bare",
+       "swamp_tree_trunk",
+       "dead_tree_tiny"
       ]
      },
      "stones": {
       "weight": 0.01,
       "props": [
-       "stone_big"
+       "stone_big",
+       "mossy_rock",
+       "mossy_rock_large"
       ]
      },
      "misc": {
@@ -1149,7 +1318,9 @@
        "up_rib",
        "pile_of_skulls",
        "down_skeleton",
-       "up_skeleton"
+       "up_skeleton",
+       "forest_root_spread",
+       "mossy_log"
       ]
      }
     }
@@ -1163,7 +1334,9 @@
      "vegetation": {
       "weight": 0.05,
       "props": [
-       "pine_tree_big"
+       "swamp_tree",
+       "swamp_tree_bare",
+       "swamp_tree_trunk"
       ]
      },
      "stones": {
@@ -1179,7 +1352,11 @@
        "swamp_reed_02",
        "swamp_reed_horsetail_01",
        "swamp_reed_horsetail_04",
-       "small_fern"
+       "small_fern",
+       "swamp_horsetail_thin",
+       "swamp_horsetail_tall",
+       "swamp_horsetail_bushy",
+       "mossy_log"
       ]
      }
     }
