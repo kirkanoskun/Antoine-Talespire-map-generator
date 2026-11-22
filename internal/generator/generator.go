@@ -152,6 +152,9 @@ type HeightField struct {
 	// Full-catalogue objects: their footprints, reserved before the scatter.
 	objects     []PlacedObject
 	objectTiles [][]bool
+	// Ruined buildings (ruins zones): footprints and wall pieces, for the preview.
+	ruins     []Ruin
+	ruinWalls []RuinWall
 }
 
 // PropKind is the scatter a tile carries on top of its ground (at most one
@@ -239,12 +242,17 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 	if err != nil {
 		return nil, err
 	}
+	ruinParts, err := g.placeRuins(doc, mask, field, paths, seed)
+	if err != nil {
+		return nil, err
+	}
 	var placements []placement
 	placements = g.placeGround(placements, biome, field, rng)
 	placements = g.placeProps(placements, biome, doc, field, trans, paths, rng)
 	placements = g.placePOIs(placements, doc, mask, field, rng, res)
 	placements = append(placements, buildingParts...)
 	placements = append(placements, objectParts...)
+	placements = append(placements, ruinParts...)
 	res.AssetCount = len(placements)
 
 	// Whole-map slab (always produced, for a single copy-paste).
@@ -625,7 +633,11 @@ func (g *Generator) placePOIs(out []placement, doc *ir.IR, mask *spatial.Mask, f
 
 			var positions [][2]int
 			if poi.Position.Scattered {
-				positions = scatterInZone(mask, zi, poi.Count, rng)
+				// Scattered points land on free tiles: never inside a ruin, an
+				// object or a building, which would skip them.
+				positions = scatterInZone(mask, zi, poi.Count, rng, func(x, y int) bool {
+					return !f.BuildingAt(x, y) && !f.ObjectAt(x, y)
+				})
 			} else {
 				positions = [][2]int{{poi.Position.X, poi.Position.Y}}
 			}
@@ -837,11 +849,11 @@ func randomRotation(rng *rand.Rand) int {
 	return rng.Intn(4) * 384
 }
 
-func scatterInZone(mask *spatial.Mask, zoneIdx, count int, rng *rand.Rand) [][2]int {
+func scatterInZone(mask *spatial.Mask, zoneIdx, count int, rng *rand.Rand, free func(x, y int) bool) [][2]int {
 	var tiles [][2]int
 	for x := 0; x < mask.Width; x++ {
 		for y := 0; y < mask.Length; y++ {
-			if mask.ZoneIndexAt(x, y) == zoneIdx {
+			if mask.ZoneIndexAt(x, y) == zoneIdx && free(x, y) {
 				tiles = append(tiles, [2]int{x, y})
 			}
 		}

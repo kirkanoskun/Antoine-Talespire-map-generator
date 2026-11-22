@@ -1883,5 +1883,50 @@
         "offset_z": 0
       }
     ]
+  },
+  {
+    "id": "ruin_rubble_pile",
+    "asset_parts": [
+      {
+        "id": "AAAWw5Cp3XXcRZzDz7i94Kn/",
+        "name": "castle_ruins_rockpile_misc_exterior",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "ruin_rubble_rocks",
+    "asset_parts": [
+      {
+        "id": "AADxhJ6CJbT1T6w0gk7Oo9hZ",
+        "name": "rubble_rocks_pile",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
+  },
+  {
+    "id": "ruin_pebbles",
+    "asset_parts": [
+      {
+        "id": "AADsjSisKzd6TLcPOkgRWSCr",
+        "name": "rubble_pebbles_spread_out",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 1
+      }
+    ]
   }
 ]
