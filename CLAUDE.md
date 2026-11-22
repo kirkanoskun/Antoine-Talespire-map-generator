@@ -421,8 +421,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   trunk stands at the centre of its bounds can carry one: in game the tip set
   on `swamp_tree_base_01` stood half a tile aside, so that base only grows
   alone (`swamp_tree_trunk`) and both stacked swamp trees use
-  `swamp_tree_base_02`. Validated in game: the jungle tree and the three-piece
-  swamp tree (22 Nov); the base_02 bare tree was seen aligned earlier. New ids never reuse a catalogue slug, so a point of interest naming
+  `swamp_tree_base_02`. Validated in game (22 Nov): the jungle tree, the
+  three-piece swamp tree and the bare swamp tree on base_02, every trunk
+  continuous. New ids never reuse a catalogue slug, so a point of interest naming
   a catalogue object keeps its exact placement. Every `ground` relief offers
   at least ten props (`TestBiomesScatterAVariedCatalogue`). In game (15 Nov)
   the forest, swamp and jungle maps showed every new prop seated on the ground.
