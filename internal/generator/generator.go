@@ -247,7 +247,7 @@ func (g *Generator) Generate(doc *ir.IR, mask *spatial.Mask, seed int64) (*Resul
 		return nil, err
 	}
 	var placements []placement
-	placements = g.placeGround(placements, biome, field, rng)
+	placements = g.placeGround(placements, biome, field, rng, seed)
 	placements = g.placeProps(placements, biome, doc, field, trans, paths, rng)
 	placements = g.placePOIs(placements, doc, mask, field, rng, res)
 	placements = append(placements, buildingParts...)
@@ -490,11 +490,11 @@ func shapeTerrain(doc *ir.IR, mask *spatial.Mask) *HeightField {
 // placeGround stacks building blocks for every tile, filling vertical gaps down
 // to the lowest 4-neighbour so cliffs between heights are solid (mirrors
 // taleslab's wall-filling), using the map biome and each tile's resolved relief.
-func (g *Generator) placeGround(out []placement, biome *taleslabentities.Biome, f *HeightField, rng *rand.Rand) []placement {
+func (g *Generator) placeGround(out []placement, biome *taleslabentities.Biome, f *HeightField, rng *rand.Rand, seed int64) []placement {
 	for x := 0; x < f.Width; x++ {
 		for y := 0; y < f.Length; y++ {
 			t := f.tiles[x][y]
-			block := g.buildingBlock(biome, t.relief, rng)
+			block := g.buildingBlock(biome, t.relief, rng, func(n int) int { return groundPatch(seed, x, y, n) })
 			// A dug tile still draws its block, so digging a cellar leaves the
 			// random sequence — and so the rest of the map — unchanged.
 			if block == nil || f.dugAt(x, y) {
@@ -720,7 +720,13 @@ func (g *Generator) carvePaths(doc *ir.IR, f *HeightField, paths *spatial.Paths,
 
 // buildingBlock picks a building block for a relief key, falling back to the
 // biome's "ground" relief when the resolved relief has no building blocks.
-func (g *Generator) buildingBlock(b *taleslabentities.Biome, reliefKey string, rng *rand.Rand) *taleslabentities.Prop {
+//
+// A relief with several blocks (the jungle's mud and leafy floors, the ruins'
+// gravel and cave rock) used to pick one at random for every tile, which reads
+// as a checkerboard in game. The block now comes from patch, so each kind
+// covers irregular patches of a dozen tiles or so; the random number is still
+// drawn, so the rest of the map (the scatter) comes out the same.
+func (g *Generator) buildingBlock(b *taleslabentities.Biome, reliefKey string, rng *rand.Rand, patch func(n int) int) *taleslabentities.Prop {
 	relief := b.Reliefs[elementtype.ElementType(reliefKey)]
 	if relief == nil || len(relief.BuildingBlocks) == 0 {
 		relief = b.Reliefs[elementtype.Ground]
@@ -728,8 +734,46 @@ func (g *Generator) buildingBlock(b *taleslabentities.Biome, reliefKey string, r
 	if relief == nil || len(relief.BuildingBlocks) == 0 {
 		return nil
 	}
-	key := relief.BuildingBlocks[rng.Intn(len(relief.BuildingBlocks))]
-	return g.props.GetProp(key)
+	n := len(relief.BuildingBlocks)
+	_ = rng.Intn(n)
+	return g.props.GetProp(relief.BuildingBlocks[patch(n)])
+}
+
+// groundPatchCell is the side, in tiles, of the cells that seed ground patches.
+const groundPatchCell = 4
+
+// groundPatch picks one of n blocks for tile (x,y) so that tiles group into
+// irregular patches: every cell of groundPatchCell tiles holds a point at a
+// random spot with a random block, and a tile takes the block of the nearest
+// point. Every block is equally likely over a patch, as each was over a tile,
+// so a relief listing a block twice still weights it twice.
+func groundPatch(seed int64, x, y, n int) int {
+	if n <= 1 {
+		return 0
+	}
+	cx, cy := x/groundPatchCell, y/groundPatchCell
+	best, pick := math.MaxFloat64, 0
+	for i := cx - 1; i <= cx+1; i++ {
+		for j := cy - 1; j <= cy+1; j++ {
+			h := patchHash(seed, i, j)
+			px := float64(i*groundPatchCell) + float64(h&0xffff)/65536*groundPatchCell
+			py := float64(j*groundPatchCell) + float64((h>>16)&0xffff)/65536*groundPatchCell
+			dx, dy := float64(x)+0.5-px, float64(y)+0.5-py
+			if d := dx*dx + dy*dy; d < best {
+				best, pick = d, int((h>>32)%uint64(n))
+			}
+		}
+	}
+	return pick
+}
+
+// patchHash mixes a seed and a cell into 64 well-spread bits (splitmix64).
+func patchHash(seed int64, i, j int) uint64 {
+	z := uint64(seed) ^ uint64(int64(i))*0x9e3779b97f4a7c15 ^ uint64(int64(j))*0xc2b2ae3d27d4eb4f
+	z += 0x9e3779b97f4a7c15
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb
+	return z ^ (z >> 31)
 }
 
 // --- helpers ---

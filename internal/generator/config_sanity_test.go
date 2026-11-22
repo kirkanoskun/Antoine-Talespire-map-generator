@@ -401,3 +401,33 @@ func TestRuinsStandOnGravelNotAshes(t *testing.T) {
 		}
 	}
 }
+
+// A relief with several ground blocks lays them in patches, not as a per-tile
+// draw that reads as a checkerboard in game (the jungle, the ruins' gravel and
+// rock): most neighbours share their block, and every block still gets its
+// share of the ground.
+func TestGroundGrowsInPatches(t *testing.T) {
+	const side, n = 80, 2
+	same, pairs := 0, 0
+	count := make([]int, n)
+	for x := 0; x < side; x++ {
+		for y := 0; y < side; y++ {
+			b := groundPatch(11, x, y, n)
+			count[b]++
+			if x+1 < side {
+				pairs++
+				if groundPatch(11, x+1, y, n) == b {
+					same++
+				}
+			}
+		}
+	}
+	if f := float64(same) / float64(pairs); f < 0.8 {
+		t.Errorf("%.0f%% of neighbours share their block, want patches (a per-tile draw gives 50%%)", f*100)
+	}
+	for b, c := range count {
+		if f := float64(c) / (side * side); f < 0.3 || f > 0.7 {
+			t.Errorf("block %d covers %.0f%% of the ground, want about half", b, f*100)
+		}
+	}
+}

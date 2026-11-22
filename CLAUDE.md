@@ -457,6 +457,14 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   `ruin_rubble_rocks`, `ruin_pebbles`) instead of the cliff. Validated in
   game (22 Nov): a single ruin and a 40x40 ruined village, walls on their
   floors' edges on all four sides, jagged tops, approved by Antoine.
+- **Ground in patches, not a checkerboard.** A relief listing several
+  building blocks (the jungle's mud and leafy floors, the ruins' gravel and
+  cave rock) drew one per tile, which read as a checkerboard in game.
+  `groundPatch` now lays them in irregular patches (a jittered point per 4x4
+  cell, each tile takes its nearest point's block), still weighting a block
+  listed twice twice (`TestGroundGrowsInPatches`). `buildingBlock` still draws
+  its random number, so the scatter is unchanged; the golden only swaps ground
+  tiles. In-game validation pending.
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.
