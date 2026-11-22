@@ -191,7 +191,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   sit at the exact centre of a courtyard (`testdata/nested.json`, `castle.json`).
 - **New reliefs, not borrowed biomes.** Needs unmet by the biome (ruins, paving,
   …) are added as reliefs to that biome in `configs/biomes.json`. `ruins` was
-  added to `temperate_forest` (broken-stone floor blocks + wall/skull props).
+  added to `temperate_forest` (broken-stone floor blocks + wall/skull props);
+  its floor is gravel (`gravel_small`, "Gravel 1x1") and cave rock, no longer
+  half lava ashes (`TestRuinsStandOnGravelNotAshes`).
 - **POI vocabulary is bridged.** The asset catalogue is fixed and small, so
   descriptive POI names ("broken_pillar", "altar") are mapped to real prop ids
   via `internal/generator/aliases.go`. Unknown props become warnings, never

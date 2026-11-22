@@ -1868,5 +1868,20 @@
         "offset_z": 1
       }
     ]
+  },
+  {
+    "id": "gravel_small",
+    "asset_parts": [
+      {
+        "id": "AAAWXKABPOIjTZtuyayBc2yi",
+        "name": "gravel_1x1_01",
+        "dimensions": {
+          "width": 1,
+          "length": 1,
+          "height": 1
+        },
+        "offset_z": 0
+      }
+    ]
   }
 ]

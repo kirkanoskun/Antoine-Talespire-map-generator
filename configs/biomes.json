@@ -315,7 +315,7 @@
    {
     "key": "ruins",
     "building_blocks": [
-     "dead_ground_small",
+     "gravel_small",
      "cavern_one_rock"
     ],
     "prop_blocks": {

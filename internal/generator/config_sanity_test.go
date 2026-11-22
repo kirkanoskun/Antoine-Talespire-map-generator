@@ -379,3 +379,25 @@ func TestSwampStandsOnMudNotAshes(t *testing.T) {
 		}
 	}
 }
+
+// Ruins stand on gravel and cave rock: their floor used to be half lava
+// ashes (dead_ground_small), a burnt look a temperate ruin never asked for.
+func TestRuinsStandOnGravelNotAshes(t *testing.T) {
+	var biomes biomeCatalog
+	loadJSON(t, "biomes.json", &biomes)
+	for _, b := range biomes {
+		for _, r := range b.Reliefs {
+			if r.Key != "ruins" {
+				continue
+			}
+			if len(r.BuildingBlocks) == 0 || r.BuildingBlocks[0] != "gravel_small" {
+				t.Errorf("%s/ruins blocks = %v, want gravel first", b.BiomeType, r.BuildingBlocks)
+			}
+			for _, block := range r.BuildingBlocks {
+				if block == "dead_ground_small" || block == "lava_dust" {
+					t.Errorf("%s/ruins is paved with lava ashes (%s)", b.BiomeType, block)
+				}
+			}
+		}
+	}
+}
