@@ -79,6 +79,10 @@ les murs à l'échelle.
 Les bâtiments évitent les chemins, l'eau, les objets et les points d'intérêt
 placés à la main (un autel au milieu des ruines reste à sa place).
 
+Vérifié dans le jeu le 22 novembre : une ruine seule et un village en ruines de
+40 × 40 cases. Les murs tombent au bord du sol sur les quatre côtés, et leur
+ligne de faîte est bien irrégulière.
+
 ## Pistes pour la suite
 
 - **Plus de pièces** : arches au-dessus des portes, piliers isolés, murs à

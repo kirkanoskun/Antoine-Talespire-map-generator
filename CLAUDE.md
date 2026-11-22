@@ -454,8 +454,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   mirrored), held by `TestRuinWallsStandOnTheirFloorsEdgeInTheGame`. The
   preview draws each wall piece to scale (legend `ruin_wall`). Between the
   buildings the ruins relief scatters rubble (`ruin_rubble_pile`,
-  `ruin_rubble_rocks`, `ruin_pebbles`) instead of the cliff. In-game
-  validation pending.
+  `ruin_rubble_rocks`, `ruin_pebbles`) instead of the cliff. Validated in
+  game (22 Nov): a single ruin and a 40x40 ruined village, walls on their
+  floors' edges on all four sides, jagged tops, approved by Antoine.
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.
