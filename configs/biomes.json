@@ -1195,7 +1195,7 @@
    {
     "key": "base_ground",
     "building_blocks": [
-     "dead_ground_small"
+     "mud_small"
     ],
     "prop_blocks": {
      "vegetation": {
@@ -1240,7 +1240,7 @@
    {
     "key": "ground",
     "building_blocks": [
-     "dead_ground_small"
+     "mud_small"
     ],
     "prop_blocks": {
      "vegetation": {
@@ -1286,7 +1286,7 @@
    {
     "key": "mountain",
     "building_blocks": [
-     "dead_ground_small"
+     "mud_with_feather_small"
     ],
     "prop_blocks": {
      "vegetation": {

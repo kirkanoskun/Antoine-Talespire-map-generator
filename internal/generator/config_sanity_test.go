@@ -335,3 +335,47 @@ func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
 		t.Errorf("props.json has no %s", id)
 	}
 }
+
+// B4 of the 2026-11-14 review: the swamp's ground was dead_ground_small,
+// which is TaleSpire's "Lava floor 1x1 (ashes)". Its dry land is now the
+// game's swamp floor (and a leafy floor on its knolls): no swamp relief is
+// paved with anything from the lava set.
+func TestSwampStandsOnMudNotAshes(t *testing.T) {
+	var biomes biomeCatalog
+	loadJSON(t, "biomes.json", &biomes)
+	var props propCatalog
+	loadJSON(t, "props.json", &props)
+	parts := map[string][]string{}
+	for _, p := range props {
+		for _, part := range p.Parts {
+			parts[p.ID] = append(parts[p.ID], part.ID)
+		}
+	}
+	cat, err := Assets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	swampFloor, ok := cat.BySlug("swamp_floor_1x1")
+	if !ok {
+		t.Fatal("swamp_floor_1x1 is not in the catalogue")
+	}
+	for _, b := range biomes {
+		if b.BiomeType != "swamp" {
+			continue
+		}
+		for _, r := range b.Reliefs {
+			for _, block := range r.BuildingBlocks {
+				for _, id := range parts[block] {
+					if a, ok := cat.ByID(id); ok && strings.Contains(a.Slug, "lava") {
+						t.Errorf("swamp/%s is paved with %s (%s)", r.Key, block, a.Slug)
+					}
+				}
+			}
+			if r.Key == "ground" || r.Key == "base_ground" {
+				if len(r.BuildingBlocks) != 1 || len(parts[r.BuildingBlocks[0]]) != 1 || parts[r.BuildingBlocks[0]][0] != swampFloor.ID {
+					t.Errorf("swamp/%s blocks = %v, want the swamp floor alone", r.Key, r.BuildingBlocks)
+				}
+			}
+		}
+	}
+}
