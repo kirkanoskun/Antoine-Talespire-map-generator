@@ -191,7 +191,9 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   sit at the exact centre of a courtyard (`testdata/nested.json`, `castle.json`).
 - **New reliefs, not borrowed biomes.** Needs unmet by the biome (ruins, paving,
   …) are added as reliefs to that biome in `configs/biomes.json`. `ruins` was
-  added to `temperate_forest` (broken-stone floor blocks + wall/skull props).
+  added to `temperate_forest` (broken-stone floor blocks + wall/skull props);
+  its floor is gravel (`gravel_small`, "Gravel 1x1") and cave rock, no longer
+  half lava ashes (`TestRuinsStandOnGravelNotAshes`).
 - **POI vocabulary is bridged.** The asset catalogue is fixed and small, so
   descriptive POI names ("broken_pillar", "altar") are mapped to real prop ids
   via `internal/generator/aliases.go`. Unknown props become warnings, never
@@ -400,9 +402,13 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   gives theme objects their French name in the zone list and warnings.
 - **New reliefs.** `paving` on temperate_forest uses "castle floor 1x1" (one
   step tall, stackable; the CobbleStone tiles are a quarter tile and would leave
-  gaps); `swamp_floor` on swamp uses `mud_small`, which *is* "Swamp floor 1x1"
-  (the swamp's old ground, `dead_ground_small`, is actually lava ashes, left
-  alone), with reeds as misc. The swamp's water carries lily pads (`offset_z`
+  gaps); `swamp_floor` on swamp uses `mud_small`, which *is* "Swamp floor 1x1",
+  with reeds as misc. The swamp's own `ground` and `base_ground` used
+  `dead_ground_small`, which is actually lava ashes; since review item B4 they
+  are swamp floor too, and its `mountain` knolls a leafy jungle floor
+  (`mud_with_feather_small`), so no swamp relief is paved from the lava set
+  (`TestSwampStandsOnMudNotAshes`). The preview still colours reliefs, not
+  materials: a swamp's `ground` is drawn green. The swamp's water carries lily pads (`offset_z`
   1, height to confirm in game). The preview draws flagstones and mud textures
   and outlines each object's footprint with its pin at the centre.
 - **Size.** The engine grows from 14.1 to 15.2 MB raw (3.05 -> 3.30 MB gzip).
