@@ -433,6 +433,29 @@ ANTHROPIC_API_KEY=... go run ./cmd/server
   a catalogue object keeps its exact placement. Every `ground` relief offers
   at least ten props (`TestBiomesScatterAVariedCatalogue`). In game (15 Nov)
   the forest, swamp and jungle maps showed every new prop seated on the ground.
+- **Ruined buildings (`internal/generator/ruins.go`).** The ruins relief used
+  to scatter a 4.6-tile cliff (`big_stone_wall`) and boulders: ruins read as
+  big rocks. Every zone whose `relief_override` is `ruins` now gets ruined
+  buildings, built from rules measured on 95 community slabs
+  (`docs/analyse-slabs-ruines.md`; the slabs are studied, never committed):
+  rectangles of 4-8 floor tiles a side, a broken Castle Ruins floor (72 %)
+  laid on top of the ground, one course of `castle_ruins_wall_01` on the inner
+  half of the surrounding ring with a doorway and gaps, half the wall pieces
+  sunk 1-3 steps (the jagged top line, `TestRuinWallsAreJagged`) and a few
+  carrying a sunk second course, rubble stacked in the open corner squares and
+  in gaps, plants where the floor is gone. Buildings cover ~40 % of the zone,
+  with a free tile between two, off paths, water, objects and hand-placed
+  points of interest; scattered points now pick free tiles
+  (`TestRuinsLeaveThePointsOfInterest`). Exact Slab path, own random source
+  (`ruinSeedSalt`). **A turned tile's position is the corner of its turned
+  footprint** (measured: floor tiles turned by any quarter keep their
+  position), so a wall's mirror shift is its footprint depth; walls turn by
+  side, west 0, north 6, east 12, south 18 (game north = map north once
+  mirrored), held by `TestRuinWallsStandOnTheirFloorsEdgeInTheGame`. The
+  preview draws each wall piece to scale (legend `ruin_wall`). Between the
+  buildings the ruins relief scatters rubble (`ruin_rubble_pile`,
+  `ruin_rubble_rocks`, `ruin_pebbles`) instead of the cliff. In-game
+  validation pending.
 - **Reference scenes.** `testdata/scene_place_village.json` and
   `scene_cimetiere_marais.json` place every object without a warning
   (`TestReferenceScenes`); they are what to paste in TaleSpire to validate RG4.

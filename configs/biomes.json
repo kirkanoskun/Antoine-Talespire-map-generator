@@ -320,18 +320,21 @@
     ],
     "prop_blocks": {
      "vegetation": {
-      "weight": 0.05,
+      "weight": 0.06,
       "props": [
        "small_dead_bush",
        "floor_bush",
        "big_dead_bush",
-       "dead_tree_tiny"
+       "dead_tree_tiny",
+       "bush_tree"
       ]
      },
      "stones": {
-      "weight": 0.3,
+      "weight": 0.15,
       "props": [
-       "big_stone_wall",
+       "ruin_rubble_pile",
+       "ruin_rubble_rocks",
+       "ruin_pebbles",
        "stone_big"
       ]
      },

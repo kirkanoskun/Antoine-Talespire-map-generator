@@ -11,6 +11,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"math"
 	"os"
 
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/generator"
@@ -40,6 +41,7 @@ var texturedReliefs = map[string]string{
 
 var (
 	boundaryColor  = color.RGBA{25, 25, 25, 255}
+	ruinWallColor  = color.RGBA{58, 50, 44, 255}    // ruined walls: dark stone, drawn to scale
 	poiColor       = color.RGBA{246, 238, 222, 255} // a light pin with a dark ring reads on any terrain
 	poiRingColor   = color.RGBA{27, 21, 17, 255}
 	anchorColor    = color.RGBA{20, 20, 20, 255}
@@ -112,6 +114,9 @@ func Legend(doc *ir.IR, field *generator.HeightField) []LegendEntry {
 	}
 	if len(doc.Zones) > 1 {
 		out = append(out, LegendEntry{"boundary", hex(blend(ground, boundaryColor, 0.45)), "line", 0})
+	}
+	if n := len(field.Ruins()); n > 0 {
+		out = append(out, LegendEntry{"ruin_wall", hex(ruinWallColor), "line", n})
 	}
 	if n := len(field.POIs()) + len(field.Objects()); n > 0 {
 		out = append(out, LegendEntry{"poi", hex(poiColor), "pin", n})
@@ -195,6 +200,12 @@ func Render(doc *ir.IR, mask *spatial.Mask, field *generator.HeightField, opts O
 				disc(img, x, y, scale, float64(scale)*0.2, detail(bases[x][y]))
 			}
 		}
+	}
+
+	// Ruined buildings: each wall piece to scale, half a tile thick, so the
+	// doorways and fallen sections show where the walls are missing.
+	for _, wl := range field.RuinWalls() {
+		rect(img, wl.X1*float64(scale), wl.Y1*float64(scale), wl.X2*float64(scale), wl.Y2*float64(scale), ruinWallColor)
 	}
 
 	if opts.MarkAnchors {
@@ -304,6 +315,20 @@ func outline(img *image.RGBA, x0, y0, w, h int) {
 		set(x0+w-1, y0+j, poiRingColor)
 		set(x0+1, y0+j, poiColor)
 		set(x0+w-2, y0+j, poiColor)
+	}
+}
+
+// rect fills the pixels whose centres lie in [x1,x2) x [y1,y2), at least one
+// pixel across.
+func rect(img *image.RGBA, x1, y1, x2, y2 float64, c color.RGBA) {
+	px1, py1 := int(math.Round(x1)), int(math.Round(y1))
+	px2, py2 := max(px1+1, int(math.Round(x2))), max(py1+1, int(math.Round(y2)))
+	for x := px1; x < px2; x++ {
+		for y := py1; y < py2; y++ {
+			if image.Pt(x, y).In(img.Bounds()) {
+				img.SetRGBA(x, y, c)
+			}
+		}
 	}
 }
 
