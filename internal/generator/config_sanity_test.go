@@ -288,8 +288,10 @@ func TestSwampGrowsSwampTrees(t *testing.T) {
 
 // A tree built from stacked pieces puts each piece on top of the one below:
 // its offset (in half-tile steps) is the previous one's plus that piece's
-// height, so a crown neither floats nor sinks into the trunk. The swamp tree
-// and the tall jungle tree were checked this way in game.
+// height, so a crown neither floats nor sinks into the trunk. The pieces share
+// one grid position, so a piece can only carry another if its trunk stands at
+// the centre of its bounds: swamp_tree_base_01's does not (in game, the tip
+// set on it stood half a tile aside), so it only ever grows alone.
 func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
 	var props []struct {
 		ID    string `json:"id"`
@@ -304,6 +306,7 @@ func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
 		t.Fatal(err)
 	}
 	stacked := map[string]int{"swamp_tree": 3, "swamp_tree_bare": 2, "jungle_tree_tall": 2}
+	offCentre := map[string]bool{"swamp_tree_base_01": true}
 	for _, p := range props {
 		want, ok := stacked[p.ID]
 		if !ok {
@@ -318,6 +321,9 @@ func TestStackedTreesRestOnTheirTrunk(t *testing.T) {
 			below, ok := cat.ByID(p.Parts[i-1].ID)
 			if !ok {
 				t.Fatalf("%s: piece %s not in the catalogue", p.ID, p.Parts[i-1].ID)
+			}
+			if offCentre[below.Slug] {
+				t.Errorf("%s: %s carries a piece, but its trunk is off its centre", p.ID, below.Slug)
 			}
 			step := p.Parts[i-1].OffsetZ + int(math.Round(below.Size[2]*2))
 			if got := p.Parts[i].OffsetZ; got != step {
