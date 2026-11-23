@@ -11,6 +11,15 @@ import (
 // SetPrefabs wires the shared catalogue before generation starts.
 func (g *Generator) SetPrefabs(store *prefab.Store) { g.prefabs = store }
 
+// Prefab describes a building of the catalogue, for its credit.
+func (g *Generator) Prefab(id string) (prefab.Info, bool) {
+	b, ok := g.prefabs.Get(id)
+	if !ok {
+		return prefab.Info{}, false
+	}
+	return b.Info, true
+}
+
 // BuildingAt identifies the reserved prefab footprint for scatter and preview.
 func (f *HeightField) BuildingAt(x, y int) bool {
 	return f.buildings != nil && f.buildings[x][y]

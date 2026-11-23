@@ -116,6 +116,10 @@ func TestPromptIsHeadPlusSceneLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The head lists the community buildings, as cmd/web/prompthead writes it.
+	if catalog.Prefabs, err = talespire.BuiltinPrefabs(); err != nil {
+		t.Fatal(err)
+	}
 	for _, c := range []struct{ body, scene string }{
 		{`{"description":"  une clairière  ","width":40,"length":30,"biome":""}`,
 			"Map: width=40, length=30\n\nDescription:\nune clairière"},
@@ -200,5 +204,31 @@ func TestCatalogueObjectsAndUnknownProps(t *testing.T) {
 	}
 	if !strings.Contains(string(r.body), `"warnings"`) || out.Code == "" {
 		t.Fatalf("no code: %s", r.body)
+	}
+}
+
+// The site carries the community buildings: a map that places one gets it,
+// and its credit (the licence asks for the author's name wherever it shows).
+func TestSitePlacesACommunityBuildingWithItsCredit(t *testing.T) {
+	doc := `{"map":{"width":40,"length":40,"biome":"swamp"},
+		"zones":[{"id":"rive","anchor":{"x":20,"y":20},"relative_size":1,"elevation":"flat"}],
+		"buildings":[{"prefab":"tt_swamp_witch_hovel_morganna_bloodreed","position":{"x":8,"y":8},"rotation":0}]}`
+	body, _ := json.Marshal(map[string]string{"text": doc})
+	r := call(handler(t), "POST", "/api/generate", string(body))
+	var out struct {
+		Code     string
+		Warnings []string
+		Credits  []struct {
+			Name, Author, License string
+			SourceURL             string `json:"source_url"`
+		}
+	}
+	decode(t, r, &out)
+	if r.status != http.StatusOK || out.Code == "" {
+		t.Fatalf("status %d: %s", r.status, r.body)
+	}
+	if len(out.Credits) != 1 || out.Credits[0].Author != "BiBo" || out.Credits[0].License != "CC BY 4.0" ||
+		!strings.HasPrefix(out.Credits[0].SourceURL, "https://talestavern.com/slab/") {
+		t.Errorf("credits = %+v, want the witch's hovel by BiBo, CC BY 4.0, with its page", out.Credits)
 	}
 }

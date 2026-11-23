@@ -20,5 +20,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("loading catalog: %v", err)
 	}
+	buildings, err := talespire.BuiltinPrefabs()
+	if err != nil {
+		log.Fatalf("loading community buildings: %v", err)
+	}
+	catalog.Prefabs = buildings
 	fmt.Fprint(os.Stdout, catalog.PromptHead())
 }

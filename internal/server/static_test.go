@@ -2,11 +2,17 @@ package server_test
 
 import (
 	"bytes"
+	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
+
+	talespire "github.com/kirkanoskun/antoine-talespire-map-generator"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 )
 
 // resourceRef matches what a page *loads* (stylesheets, scripts, images,
@@ -60,6 +66,29 @@ func TestSelfHostedFontsAreServed(t *testing.T) {
 		rec := get(t, h, m[1])
 		if rec.Code != http.StatusOK || !bytes.HasPrefix(rec.Body.Bytes(), []byte("wOF2")) {
 			t.Errorf("%s: status %d, not a WOFF2 font", m[1], rec.Code)
+		}
+	}
+}
+
+// Every community building that ships with the app is credited on the legal
+// notice: name, author and licence, as its licence asks.
+func TestLegalNoticeCreditsEveryBuiltInBuilding(t *testing.T) {
+	page, err := os.ReadFile("static/mentions-legales.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []prefab.Entry
+	if err := json.Unmarshal(talespire.PrefabCatalog(), &entries); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("no built-in building")
+	}
+	for _, e := range entries {
+		for _, want := range []string{html.EscapeString(e.Name), html.EscapeString(e.Author), e.License, html.EscapeString(e.SourceURL)} {
+			if !strings.Contains(string(page), want) {
+				t.Errorf("%s: the legal notice does not credit %q", e.ID, want)
+			}
 		}
 	}
 }

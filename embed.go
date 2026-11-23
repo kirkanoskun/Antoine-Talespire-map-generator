@@ -6,6 +6,7 @@ package talespire
 import (
 	"embed"
 	"fmt"
+	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/prefab"
 	"os"
 	"path/filepath"
 )
@@ -68,4 +69,11 @@ func WriteConfigs() (biomesPath, propsPath string, cleanup func(), err error) {
 func PrefabCatalog() []byte {
 	data, _ := configsFS.ReadFile("configs/prefabs.json")
 	return data
+}
+
+// BuiltinPrefabs opens the built-in community building catalogue on its own,
+// read-only: no local imports. The website uses it, so its maps can carry the
+// community buildings without offering an import panel.
+func BuiltinPrefabs() (*prefab.Store, error) {
+	return prefab.Open("", PrefabCatalog())
 }

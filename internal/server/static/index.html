@@ -175,6 +175,11 @@
   .export .err{margin:0 0 14px}
   .zones small{display:block; color:var(--muted); font-size:13px}
   .warnings{margin:24px 0 0; padding-left:20px; color:var(--muted); font-size:14px}
+  .credits{margin:24px 0 0; font-size:14px; color:var(--muted); max-width:70ch}
+  .credits h3{font-size:14px; margin:0}
+  .credits ul{margin:8px 0 0; padding-left:20px}
+  .credits li{margin-bottom:4px}
+  .credits a{color:inherit}
   .repairs{margin:24px 0 0; font-size:14px; color:var(--muted); max-width:70ch}
   .repairs ul{margin:8px 0 0; padding-left:20px}
   .repairs li{margin-bottom:4px}
@@ -447,6 +452,10 @@
           <ol class="zones" id="zones"></ol>
         </div>
       </div>
+    </div>
+    <div class="credits" id="creditsWrap" hidden>
+      <h3>Bâtiments de la communauté</h3>
+      <ul id="creditsList"></ul>
     </div>
     <details class="repairs" id="repairsWrap" hidden>
       <summary id="repairsSummary"></summary>
@@ -930,6 +939,16 @@ function renderMap(data){
   $('oversize').textContent = 'Un morceau reste trop lourd pour TaleSpire (plus de 30 ko environ) : il se collera, mais le plateau risque de ne pas s’enregistrer. Allégez la zone concernée ou réduisez la taille de la carte, puis redemandez-la.';
   const warnings = (data.warnings || []).filter((w) => !heavy.includes(w)).map(frenchWarning);
   $('mapWarnings').replaceChildren(...warnings.map((t) => el('li', {}, t)));
+  // Community buildings on the map, credited as their licences ask.
+  const credits = data.credits || [];
+  $('creditsWrap').hidden = !credits.length;
+  $('creditsList').replaceChildren(...credits.map((c) => {
+    const li = el('li');
+    li.append(c.source_url ? el('a', {href: c.source_url, target: '_blank', rel: 'noopener'}, c.name) : c.name);
+    if (c.author) li.append(`, par ${c.author}`);
+    if (c.license) li.append(` (licence ${c.license})`);
+    return li;
+  }));
   // Slips the engine corrected by itself in the AI's reply: said, not hidden,
   // and opened when something the GM asked for is missing from the map.
   const repairs = data.repairs || [];

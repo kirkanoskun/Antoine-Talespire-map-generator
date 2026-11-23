@@ -696,5 +696,24 @@ footprints, water and out-of-map placements fail explicitly. See
   fails in CI — and `cmd/import-slab`, which writes the repository catalogue,
   enforces it too. Local imports (`~/.talespire/prefabs.json`, the desktop UI)
   are not redistributed and stay free.
-- **Desktop only.** The public website wires no prefab store, so the import
-  panel stays hidden there (`prefabs_enabled:false`).
+- **38 community buildings ship built in (23 Nov).** Antoine picked 107
+  TalesTavern slabs; the 38 that carry a Creative Commons licence and decode
+  (v2 format) are in `configs/prefabs.json`, each with its creator (read from
+  its TalesTavern page: the export's author field was wrong), its page and
+  its licence (BY, BY-SA, BY-NC, BY-NC-SA, and BY-NC-ND reproduced unmodified;
+  the site is free and ad-free). Slabs without a licence are all rights
+  reserved and are never committed, credited or not; the frigate's page shows
+  no licence, so it is out too. Five automatic ground levels were wrong and
+  are set by hand (`ground_y`: the Archtree 205, the church 325, settlements
+  #2 and #3 300, the ruined castle 250, which then shows its hill).
+- **Credited wherever they show.** A map's reply carries `credits` (name,
+  author, licence, page) for the buildings it places, shown under the map as
+  "Bâtiments de la communauté"; `mentions-legales.html` lists every built-in
+  one (`TestLegalNoticeCreditsEveryBuiltInBuilding`).
+- **On the website too, without the import panel.** `talespire.BuiltinPrefabs`
+  opens the built-ins read-only; the web engine and `cmd/web/prompthead` hand
+  it to the generator and the prompt catalogue but not to the server as an
+  import target, so `prefabs_enabled` stays false there. The prompt (v1.06)
+  lists the buildings compactly, `id [w x l] name: what it is`, and tells the
+  AI to use them generously when they fit (head 9.2 -> 14.8 kB; engine 16.8 MB
+  raw). `TestSitePlacesACommunityBuildingWithItsCredit` holds the web path.

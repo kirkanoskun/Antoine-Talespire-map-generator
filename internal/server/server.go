@@ -191,7 +191,10 @@ type genResponse struct {
 	Repairs []ir.Repair `json:"repairs,omitempty"`
 	// POILabels names, in French, the scene-theme objects the map uses, so the
 	// zone list says "fontaine" rather than a catalogue slug.
-	POILabels  map[string]string     `json:"poi_labels,omitempty"`
+	POILabels map[string]string `json:"poi_labels,omitempty"`
+	// Credits name the community buildings the map uses: their licences ask
+	// for the author to be credited wherever the build is shown.
+	Credits    []credit              `json:"credits,omitempty"`
 	Attempts   int                   `json:"attempts"`
 	PreviewURL string                `json:"preview_url"`
 	Legend     []preview.LegendEntry `json:"legend"`
@@ -426,11 +429,37 @@ func (s *Server) finish(w http.ResponseWriter, id string, doc *ir.IR, attempts i
 		UnknownProps: res.UnknownProps,
 		Repairs:      repairs,
 		POILabels:    poiLabels(doc),
+		Credits:      s.credits(doc),
 		Attempts:     attempts,
 		PreviewURL:   fmt.Sprintf("/api/preview?session=%s&v=%d", id, version),
 		Legend:       preview.Legend(doc, res.Height),
 		Labels:       mask.LabelPoints(),
 	})
+}
+
+// credit is one community building used on a map, as its licence asks.
+type credit struct {
+	Name      string `json:"name"`
+	Author    string `json:"author,omitempty"`
+	License   string `json:"license,omitempty"`
+	SourceURL string `json:"source_url,omitempty"`
+}
+
+// credits lists, once each and in order of appearance, the buildings a map
+// places.
+func (s *Server) credits(doc *ir.IR) []credit {
+	var out []credit
+	seen := map[string]bool{}
+	for _, b := range doc.Buildings {
+		if seen[b.Prefab] {
+			continue
+		}
+		seen[b.Prefab] = true
+		if info, ok := s.gen.Prefab(b.Prefab); ok {
+			out = append(out, credit{Name: info.Name, Author: info.Author, License: info.License, SourceURL: info.SourceURL})
+		}
+	}
+	return out
 }
 
 // --- helpers ---

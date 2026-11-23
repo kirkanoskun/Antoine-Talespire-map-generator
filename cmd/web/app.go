@@ -39,6 +39,15 @@ func newHandler() (http.Handler, error) {
 		return nil, fmt.Errorf("loading catalog: %w", err)
 	}
 	catalog.KnownProp = gen.KnownProp
+	// The community buildings ship with the site (each credited); importing
+	// one's own stays a desktop feature, so the store is not handed to the
+	// server as an import target.
+	buildings, err := talespire.BuiltinPrefabs()
+	if err != nil {
+		return nil, fmt.Errorf("loading community buildings: %w", err)
+	}
+	gen.SetPrefabs(buildings)
+	catalog.Prefabs = buildings
 	srv := server.New(gen, server.Options{
 		Catalog:      catalog,
 		PreviewScale: 8,
