@@ -159,9 +159,14 @@ func (g *Generator) placeBuildings(doc *ir.IR, f *HeightField) ([]placement, err
 					}
 				}
 				one := &slab.Layout{ID: layout.ID, Reserved: layout.Reserved, Instances: []slab.Instance{p}}
-				// Bucket the entire prefab by its anchor so slicing never cuts a building
-				// apart. A building can extend beyond that slice's nominal tile rectangle.
-				out = append(out, placement{tileX: pb.x0, tileY: pb.y0 + pb.length - 1, imported: one, mirror: mirror})
+				// Each piece is bucketed by the tile it lands on, so slicing cuts a
+				// big building like the rest of the map: kept whole, the inn alone
+				// put one slice over TaleSpire's limit, at any slice size. Its row
+				// is the one its mirrored position falls in (encodeRegion), so no
+				// slice gets a negative position.
+				tx := min(max(p.X/100, 0), f.Width-1)
+				ty := min(max((p.Z+mirror-1)/100, 0), f.Length-1)
+				out = append(out, placement{tileX: tx, tileY: ty, imported: one, mirror: mirror})
 			}
 		}
 	}

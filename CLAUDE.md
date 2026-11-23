@@ -654,8 +654,13 @@ importer now applies the seating rule and the provenance rule.
   tiles where the build digs in.
 - **Sizing reality.** A whole map plus a whole building does not fit TaleSpire's
   ~30 kB slab limit — the inn alone is 39 kB — so slicing is the normal path, not
-  a fallback. A building kept whole inside one slice caps how small that slice
-  can get.
+  a fallback. A building used to be kept whole inside one slice, which capped
+  how small that slice could get: the inn's slice stayed at 41 kB even when
+  automatic slicing fell to 8-tile pieces (30 of them). Since 23 Nov each piece
+  of a building is bucketed by the tile it lands on (its mirrored row), so a
+  building is cut like the rest of the map: the inn's 38x45 test map is 4
+  slices under 20 kB. `TestBuildingPrecisionRotationAndSlicing` holds that the
+  slices reassemble into the exact building.
 - **Provenance is not optional.** Community builds carry per-creator licences
   (several are CC BY-NC). Any catalogue that ships in the repo or in the binary
   needs a licence field recorded per entry.

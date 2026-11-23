@@ -3,6 +3,7 @@ package generator
 import (
 	"os"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/kirkanoskun/antoine-talespire-map-generator/internal/ir"
@@ -85,22 +86,26 @@ func TestBuildingPrecisionRotationAndSlicing(t *testing.T) {
 			if sliced.Code != res.Code {
 				t.Fatal("slicing changed whole-map output")
 			}
-			count := 0
+			// A building is cut like the rest of the map (each piece goes to the
+			// slice it lands on): put back together, the slices hold it exactly.
+			var all []slab.Instance
 			for x := range sliced.Slices {
 				for y, code := range sliced.Slices[x] {
 					parts := importedInstances(t, code)
-					count += len(parts)
 					for i := range parts {
 						parts[i].X += x * 500
 						parts[i].Z += (len(sliced.Slices[x]) - 1 - y) * 500 // slices run north to south
 					}
-					if len(parts) > 0 && !reflect.DeepEqual(parts, want) {
-						t.Fatal("slicing lost or transformed building parts")
-					}
+					all = append(all, parts...)
 				}
 			}
-			if count != 2 {
-				t.Fatalf("slices contain %d building assets", count)
+			byPlace := func(v []slab.Instance) []slab.Instance {
+				v = append([]slab.Instance(nil), v...)
+				sort.Slice(v, func(i, j int) bool { return v[i].X < v[j].X || v[i].X == v[j].X && v[i].Z < v[j].Z })
+				return v
+			}
+			if !reflect.DeepEqual(byPlace(all), byPlace(want)) {
+				t.Fatalf("slicing lost or transformed building parts: %+v, want %+v", all, want)
 			}
 		})
 	}
